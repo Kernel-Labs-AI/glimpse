@@ -1,12 +1,12 @@
 {
-  "name": "@kernel-labs/glimpse",
-  "version": "0.1.1",
+  "name": "playwright-pr-review",
+  "version": "0.1.0",
   "description": "Upload Playwright screenshots to Supabase/S3 and post to GitHub PR comments",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "glimpse": "./dist/cli.js"
+    "playwright-pr-review": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -16,6 +16,10 @@
     "./playwright": {
       "import": "./dist/playwright/index.js",
       "types": "./dist/playwright/index.d.ts"
+    },
+    "./test": {
+      "import": "./dist/playwright/fixture.js",
+      "types": "./dist/playwright/fixture.d.ts"
     }
   },
   "scripts": {
@@ -34,13 +38,8 @@
     "supabase",
     "s3"
   ],
-  "author": "Alessio Fanelli",
-  "homepage": "https://github.com/Kernel-Labs-AI/glimpse",
+  "author": "",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Kernel-Labs-AI/glimpse.git"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -50,6 +49,7 @@
     "commander": "^12.1.0"
   },
   "devDependencies": {
+    "@kernel-labs/glimpse": "^0.1.1",
     "@playwright/test": "^1.56.1",
     "@types/node": "^20.19.24",
     "typescript": "^5.3.3"
