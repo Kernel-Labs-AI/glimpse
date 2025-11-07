@@ -1,0 +1,26 @@
+# Source files
+src/
+tsconfig.json
+playwright.config.ts
+
+# Tests
+tests/
+test-results/
+playwright-report/
+
+# Development files
+*.log
+.env
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# NPM
+.npmrc
+package-lock.json
+

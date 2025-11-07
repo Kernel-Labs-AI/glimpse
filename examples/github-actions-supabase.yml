@@ -1,0 +1,76 @@
+# Example GitHub Actions workflow for uploading screenshots to Supabase
+name: UI Screenshots (Supabase)
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  screenshots:
+    name: Generate UI Screenshots
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Build app
+        run: npm run build
+
+      - name: Run tests with screenshots
+        run: npm run test:e2e
+        # Your tests should use the screenshot helpers to capture screenshots
+
+      # Optional: Resize screenshots for faster uploads
+      - name: Resize screenshots
+        if: always()
+        run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          find test-results -name "*.png" -exec mogrify -resize '800x>' -quality 75 -strip {} \;
+
+      # Upload to Supabase using the library
+      - name: Upload screenshots to Supabase
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PRIVATE_KEY: ${{ secrets.SUPABASE_PRIVATE_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          npx playwright-pr-review upload \
+            --directory ./test-results \
+            --storage supabase
+
+      # Post screenshots to PR comment
+      - name: Post screenshots to PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/playwright-pr-review/dist/index.js');
+
+            const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
+
+            await postToGitHub({
+              screenshots,
+              prNumber: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              runId: context.runId,
+              repositoryUrl: context.payload.repository.html_url,
+              token: process.env.GITHUB_TOKEN
+            }, github);
