@@ -34,8 +34,13 @@
     "supabase",
     "s3"
   ],
-  "author": "",
+  "author": "Alessio Fanelli",
+  "homepage": "https://github.com/Kernel-Labs-AI/playwright-pr-review",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kernel-Labs-AI/playwright-pr-review.git"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
