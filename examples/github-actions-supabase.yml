@@ -50,7 +50,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          npx playwright-pr-review upload \
+          npx glimpse upload \
             --directory ./test-results \
             --storage supabase
 
@@ -61,7 +61,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/playwright-pr-review/dist/index.js');
+            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/glimpse/dist/index.js');
 
             const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
 

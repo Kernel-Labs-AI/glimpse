@@ -10,7 +10,7 @@ import type { StorageConfig } from './storage/index.js'
 const program = new Command()
 
 program
-  .name('playwright-pr-review')
+  .name('glimpse')
   .description('Upload Playwright screenshots to Supabase/S3 and generate PR comments')
   .version('0.1.0')
 

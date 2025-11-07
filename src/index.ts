@@ -1,5 +1,5 @@
 /**
- * playwright-pr-review
+ * Glimpse
  * Upload Playwright screenshots to Supabase/S3 and post to GitHub PR comments
  */
 

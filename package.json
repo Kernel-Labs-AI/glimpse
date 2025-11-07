@@ -1,12 +1,12 @@
 {
-  "name": "playwright-pr-review",
+  "name": "glimpse",
   "version": "0.2.1",
   "description": "Upload Playwright screenshots to Supabase/S3 and post to GitHub PR comments",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "playwright-pr-review": "./dist/cli.js"
+    "glimpse": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -35,11 +35,11 @@
     "s3"
   ],
   "author": "Alessio Fanelli",
-  "homepage": "https://github.com/Kernel-Labs-AI/playwright-pr-review",
+  "homepage": "https://github.com/Kernel-Labs-AI/glimpse",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Kernel-Labs-AI/playwright-pr-review.git"
+    "url": "https://github.com/Kernel-Labs-AI/glimpse.git"
   },
   "engines": {
     "node": ">=18.0.0"

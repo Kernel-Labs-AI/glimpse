@@ -21,11 +21,11 @@ export const DEFAULT_SCREENSHOT_DIR = process.env.PR_SCREENSHOTS_DIR || 'test-re
 
 /**
  * Helper function to capture screenshots during Playwright tests
- * Screenshots are automatically saved to a directory that can be uploaded by playwright-pr-review
+ * Screenshots are automatically saved to a directory that can be uploaded by glimpse
  *
  * @example
  * ```typescript
- * import { captureScreenshot } from 'playwright-pr-review/playwright'
+ * import { captureScreenshot } from 'glimpse/playwright'
  *
  * test('my test', async ({ page }) => {
  *   await page.goto('/')
@@ -67,7 +67,7 @@ export async function captureScreenshot(
  *
  * @example
  * ```typescript
- * import { captureScreenshotWithInfo } from 'playwright-pr-review/playwright'
+ * import { captureScreenshotWithInfo } from 'glimpse/playwright'
  *
  * test('my test', async ({ page }, testInfo) => {
  *   await page.goto('/')

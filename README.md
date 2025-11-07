@@ -1,4 +1,4 @@
-# playwright-pr-review
+# Glimpse
 
 Upload Playwright screenshots to Supabase or S3 and automatically post them to GitHub PR comments for easy visual review.
 
@@ -15,7 +15,7 @@ Upload Playwright screenshots to Supabase or S3 and automatically post them to G
 ## Installation
 
 ```bash
-npm install --save-dev playwright-pr-review
+npm install --save-dev glimpse
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ The simplest way to capture screenshots. Use this when you want basic screenshot
 
 ```typescript
 import { test, expect } from '@playwright/test'
-import { captureScreenshot } from 'playwright-pr-review/playwright'
+import { captureScreenshot } from 'glimpse/playwright'
 
 test('my app', async ({ page }) => {
   await page.goto('https://example.com')
@@ -64,7 +64,7 @@ Use this when you want better integration with Playwright's test runner and repo
 
 ```typescript
 import { test, expect } from '@playwright/test'
-import { captureScreenshotWithInfo } from 'playwright-pr-review/playwright'
+import { captureScreenshotWithInfo } from 'glimpse/playwright'
 
 test('my app', async ({ page }, testInfo) => {
   await page.goto('https://example.com')
@@ -105,7 +105,7 @@ Screenshots are automatically saved to `test-results/pr-screenshots/` (configura
 
 ```bash
 # Upload screenshots
-npx playwright-pr-review upload \
+npx glimpse upload \
   --directory ./test-results \
   --storage supabase \
   --pr 123
@@ -119,7 +119,7 @@ npx playwright-pr-review upload \
 
 ```bash
 # Upload screenshots
-npx playwright-pr-review upload \
+npx glimpse upload \
   --directory ./test-results \
   --storage s3 \
   --pr 123
@@ -180,7 +180,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          npx playwright-pr-review upload \
+          npx glimpse upload \
             --directory ./test-results \
             --storage supabase
 
@@ -191,7 +191,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/playwright-pr-review/dist/index.js');
+            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/glimpse/dist/index.js');
 
             const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
 
@@ -221,7 +221,7 @@ Just replace the upload step:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          npx playwright-pr-review upload \
+          npx glimpse upload \
             --directory ./test-results \
             --storage s3
 ```
@@ -257,7 +257,7 @@ The library works with any S3-compatible service (MinIO, DigitalOcean Spaces, Ba
 S3_ENDPOINT=https://nyc3.digitaloceanspaces.com \
 S3_REGION=us-east-1 \
 S3_BUCKET=my-screenshots \
-npx playwright-pr-review upload --directory ./test-results --storage s3
+npx glimpse upload --directory ./test-results --storage s3
 ```
 
 ## CLI Reference
@@ -267,7 +267,7 @@ npx playwright-pr-review upload --directory ./test-results --storage s3
 Upload screenshots to storage.
 
 ```bash
-npx playwright-pr-review upload [options]
+npx glimpse upload [options]
 ```
 
 **Options:**
@@ -283,7 +283,7 @@ npx playwright-pr-review upload [options]
 Generate PR comment markdown from uploaded screenshots.
 
 ```bash
-npx playwright-pr-review generate-comment [options]
+npx glimpse generate-comment [options]
 ```
 
 **Options:**
