@@ -25,7 +25,7 @@ export const DEFAULT_SCREENSHOT_DIR = process.env.PR_SCREENSHOTS_DIR || 'test-re
  *
  * @example
  * ```typescript
- * import { captureScreenshot } from 'glimpse/playwright'
+ * import { captureScreenshot } from '@kernel-labs/glimpse/playwright'
  *
  * test('my test', async ({ page }) => {
  *   await page.goto('/')
@@ -67,7 +67,7 @@ export async function captureScreenshot(
  *
  * @example
  * ```typescript
- * import { captureScreenshotWithInfo } from 'glimpse/playwright'
+ * import { captureScreenshotWithInfo } from '@kernel-labs/glimpse/playwright'
  *
  * test('my test', async ({ page }, testInfo) => {
  *   await page.goto('/')

@@ -56,7 +56,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/glimpse/dist/index.js');
+            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js');
 
             const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
 

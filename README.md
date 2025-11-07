@@ -15,7 +15,7 @@ Upload Playwright screenshots to Supabase or S3 and automatically post them to G
 ## Installation
 
 ```bash
-npm install --save-dev glimpse
+npm install --save-dev @kernel-labs/glimpse
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ The simplest way to capture screenshots. Use this when you want basic screenshot
 
 ```typescript
 import { test, expect } from '@playwright/test'
-import { captureScreenshot } from 'glimpse/playwright'
+import { captureScreenshot } from '@kernel-labs/glimpse/playwright'
 
 test('my app', async ({ page }) => {
   await page.goto('https://example.com')
@@ -64,7 +64,7 @@ Use this when you want better integration with Playwright's test runner and repo
 
 ```typescript
 import { test, expect } from '@playwright/test'
-import { captureScreenshotWithInfo } from 'glimpse/playwright'
+import { captureScreenshotWithInfo } from '@kernel-labs/glimpse/playwright'
 
 test('my app', async ({ page }, testInfo) => {
   await page.goto('https://example.com')
@@ -191,7 +191,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/glimpse/dist/index.js');
+            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js');
 
             const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
 

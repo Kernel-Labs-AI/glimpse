@@ -1,6 +1,6 @@
 // Example: Using the helper function directly
 import { test, expect } from '@playwright/test'
-import { captureScreenshot } from 'glimpse/playwright'
+import { captureScreenshot } from '@kernel-labs/glimpse/playwright'
 
 test.describe('My App Screenshots', () => {
   test('homepage', async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe('My App Screenshots', () => {
 })
 
 // Example: Using the helper with testInfo for better context
-import { captureScreenshotWithInfo } from 'glimpse/playwright'
+import { captureScreenshotWithInfo } from '@kernel-labs/glimpse/playwright'
 
 test('with test info context', async ({ page }, testInfo) => {
   await page.goto('https://example.com')

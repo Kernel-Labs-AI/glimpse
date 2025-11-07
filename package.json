@@ -1,6 +1,6 @@
 {
-  "name": "glimpse",
-  "version": "0.2.1",
+  "name": "@kernel-labs/glimpse",
+  "version": "0.1.1",
   "description": "Upload Playwright screenshots to Supabase/S3 and post to GitHub PR comments",
   "type": "module",
   "main": "./dist/index.js",
