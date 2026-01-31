@@ -3,6 +3,7 @@ import { StorageProvider, UploadOptions, UploadedScreenshot } from './storage/in
 import { SupabaseStorage } from './storage/supabase.js'
 import { S3Storage } from './storage/s3.js'
 import { findScreenshots } from './utils/find-screenshots.js'
+import { readManifest } from './utils/manifest.js'
 
 /**
  * Create a storage provider based on the configuration
@@ -56,6 +57,9 @@ export async function uploadScreenshots(
 
   console.log(`Found ${screenshots.length} screenshots to upload`)
 
+  // Read manifest for group metadata
+  const manifest = readManifest(directory)
+
   // Create storage provider
   const provider = createStorageProvider(storage)
 
@@ -70,13 +74,15 @@ export async function uploadScreenshots(
   for (const screenshotPath of screenshots.sort()) {
     const filename = path.basename(screenshotPath)
     const remotePath = generateRemotePath(pathTemplate, filename, prNumber, runId)
+    const manifestEntry = manifest[filename]
 
     try {
       const url = await provider.upload(screenshotPath, remotePath)
       uploadedScreenshots.push({
         name: filename,
         url,
-        path: remotePath
+        path: remotePath,
+        ...(manifestEntry?.group ? { group: manifestEntry.group } : {})
       })
     } catch (error: any) {
       console.error(`Failed to upload ${filename}:`, error.message)

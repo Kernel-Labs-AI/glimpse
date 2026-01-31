@@ -18,7 +18,44 @@ export interface GitHubCommentOptions {
 }
 
 /**
+ * Format a screenshot filename into a human-readable display name
+ */
+function formatDisplayName(name: string): string {
+  return name
+    .replace('.png', '')
+    .replace(/-/g, ' ')
+    .replace(/_/g, ' ')
+}
+
+/**
+ * Generate a thumbnail grid table for a set of screenshots
+ * Uses 3-column layout with clickable thumbnails
+ */
+function generateThumbnailGrid(screenshots: UploadedScreenshot[]): string {
+  if (screenshots.length === 0) return ''
+
+  let grid = '| | | |\n'
+  grid += '|---|---|---|\n'
+
+  for (let i = 0; i < screenshots.length; i += 3) {
+    const row = screenshots.slice(i, i + 3)
+    const cells = row.map(s => {
+      const displayName = formatDisplayName(s.name)
+      return `<a href="${s.url}"><img src="${s.url}" width="280"><br>${displayName}</a>`
+    })
+    // Pad with empty cells if needed
+    while (cells.length < 3) {
+      cells.push('')
+    }
+    grid += `| ${cells.join(' | ')} |\n`
+  }
+
+  return grid
+}
+
+/**
  * Generate markdown comment body for GitHub PR
+ * Groups screenshots by category and renders them as a thumbnail grid
  */
 export function generateCommentBody(options: GitHubCommentOptions): string {
   const { screenshots, runId, repositoryUrl } = options
@@ -26,14 +63,29 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
   let commentBody = '## 📸 UI Screenshots\n\n'
   commentBody += 'Automated screenshots from the latest build:\n\n'
 
-  for (const screenshot of screenshots) {
-    const displayName = screenshot.name
-      .replace('.png', '')
-      .replace(/-/g, ' ')
-      .replace(/_/g, ' ')
+  const hasGroups = screenshots.some(s => s.group)
 
-    commentBody += `### ${displayName}\n`
-    commentBody += `![${displayName}](${screenshot.url})\n\n`
+  if (hasGroups) {
+    // Group screenshots by their group field
+    const groups = new Map<string, UploadedScreenshot[]>()
+    for (const screenshot of screenshots) {
+      const group = screenshot.group || 'Other'
+      if (!groups.has(group)) {
+        groups.set(group, [])
+      }
+      groups.get(group)!.push(screenshot)
+    }
+
+    for (const [group, groupScreenshots] of groups) {
+      const count = groupScreenshots.length
+      commentBody += `<details>\n`
+      commentBody += `<summary><strong>${group}</strong> (${count} screenshot${count !== 1 ? 's' : ''})</summary>\n\n`
+      commentBody += generateThumbnailGrid(groupScreenshots)
+      commentBody += '\n</details>\n\n'
+    }
+  } else {
+    // No groups - just show the grid directly
+    commentBody += generateThumbnailGrid(screenshots)
   }
 
   commentBody += '\n---\n'

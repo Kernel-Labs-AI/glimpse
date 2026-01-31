@@ -25,3 +25,5 @@ export { S3Storage } from './storage/s3.js'
 
 // Export utilities
 export { findScreenshots } from './utils/find-screenshots.js'
+export { readManifest, MANIFEST_FILENAME } from './utils/manifest.js'
+export type { ScreenshotManifest, ScreenshotManifestEntry } from './utils/manifest.js'

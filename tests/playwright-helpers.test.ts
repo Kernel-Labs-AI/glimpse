@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { captureScreenshot, captureScreenshotWithInfo, DEFAULT_SCREENSHOT_DIR } from '../src/playwright/helpers.js'
+import { readManifest, MANIFEST_FILENAME } from '../src/utils/manifest.js'
 import { Page, TestInfo } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
@@ -12,7 +13,7 @@ test.describe('Playwright Helpers', () => {
 
   test.beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-playwright-'))
-    
+
     // Create a minimal mock page
     mockPage = {
       screenshot: async (options: any) => {
@@ -25,6 +26,7 @@ test.describe('Playwright Helpers', () => {
 
     mockTestInfo = {
       title: 'test example',
+      file: '/home/user/project/tests/decks.spec.ts',
       attachments: [],
     } as any as TestInfo
   })
@@ -69,7 +71,7 @@ test.describe('Playwright Helpers', () => {
 
   test('should create output directory if it does not exist', async () => {
     const customDir = path.join(tempDir, 'nested', 'dir')
-    
+
     await captureScreenshot(mockPage, {
       name: 'test',
       outputDir: customDir,
@@ -114,7 +116,7 @@ test.describe('Playwright Helpers', () => {
 
   test('should sanitize test name in filename', async () => {
     mockTestInfo.title = 'Test With Spaces & Special! Characters'
-    
+
     const screenshotPath = await captureScreenshotWithInfo(
       mockPage,
       mockTestInfo,
@@ -138,5 +140,82 @@ test.describe('Playwright Helpers', () => {
     expect(mockTestInfo.attachments[0].name).toContain('screenshot-test')
     expect(mockTestInfo.attachments[0].contentType).toBe('image/png')
   })
-})
 
+  test.describe('Group metadata and manifest', () => {
+    test('captureScreenshot should write manifest when group is provided', async () => {
+      await captureScreenshot(mockPage, {
+        name: 'homepage',
+        outputDir: tempDir,
+        group: 'landing.spec.ts',
+      })
+
+      const manifest = readManifest(tempDir)
+      expect(manifest['homepage.png']).toEqual({ group: 'landing.spec.ts' })
+    })
+
+    test('captureScreenshot should not write manifest without group', async () => {
+      await captureScreenshot(mockPage, {
+        name: 'homepage',
+        outputDir: tempDir,
+      })
+
+      const manifestPath = path.join(tempDir, MANIFEST_FILENAME)
+      expect(fs.existsSync(manifestPath)).toBe(false)
+    })
+
+    test('captureScreenshotWithInfo should auto-infer group from testInfo.file', async () => {
+      await captureScreenshotWithInfo(mockPage, mockTestInfo, {
+        name: 'form-filled',
+        outputDir: tempDir,
+      })
+
+      const manifest = readManifest(tempDir)
+      expect(manifest['test-example-form-filled.png']).toEqual({ group: 'decks.spec.ts' })
+    })
+
+    test('captureScreenshotWithInfo should use explicit group over inferred', async () => {
+      await captureScreenshotWithInfo(mockPage, mockTestInfo, {
+        name: 'form-filled',
+        outputDir: tempDir,
+        group: 'custom-group',
+      })
+
+      const manifest = readManifest(tempDir)
+      expect(manifest['test-example-form-filled.png']).toEqual({ group: 'custom-group' })
+    })
+
+    test('captureScreenshotWithInfo should handle missing testInfo.file', async () => {
+      const testInfoNoFile = {
+        title: 'test example',
+        attachments: [],
+      } as any as TestInfo
+
+      await captureScreenshotWithInfo(mockPage, testInfoNoFile, {
+        name: 'screenshot',
+        outputDir: tempDir,
+      })
+
+      const manifestPath = path.join(tempDir, MANIFEST_FILENAME)
+      // No file and no explicit group means no manifest entry
+      expect(fs.existsSync(manifestPath)).toBe(false)
+    })
+
+    test('multiple captures should accumulate in the same manifest', async () => {
+      await captureScreenshot(mockPage, {
+        name: 'first',
+        outputDir: tempDir,
+        group: 'auth.spec.ts',
+      })
+      await captureScreenshot(mockPage, {
+        name: 'second',
+        outputDir: tempDir,
+        group: 'decks.spec.ts',
+      })
+
+      const manifest = readManifest(tempDir)
+      expect(Object.keys(manifest)).toHaveLength(2)
+      expect(manifest['first.png'].group).toBe('auth.spec.ts')
+      expect(manifest['second.png'].group).toBe('decks.spec.ts')
+    })
+  })
+})

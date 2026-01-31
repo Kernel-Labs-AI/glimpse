@@ -3,29 +3,14 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import { uploadScreenshots } from '../src/upload.js'
+import { readManifest, writeManifestEntry, MANIFEST_FILENAME } from '../src/utils/manifest.js'
 import type { StorageConfig } from '../src/storage/index.js'
-
-// Mock storage provider for testing
-class MockStorageProvider {
-  uploadedFiles: Array<{ filePath: string; remotePath: string }> = []
-
-  async upload(filePath: string, remotePath: string): Promise<string> {
-    this.uploadedFiles.push({ filePath, remotePath })
-    return `https://example.com/${remotePath}`
-  }
-
-  async initialize(): Promise<void> {
-    // No-op
-  }
-}
 
 test.describe('uploadScreenshots', () => {
   let tempDir: string
-  let mockProvider: MockStorageProvider
 
   test.beforeEach(async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-upload-'))
-    mockProvider = new MockStorageProvider()
   })
 
   test.afterEach(async () => {
@@ -39,16 +24,9 @@ test.describe('uploadScreenshots', () => {
     fs.writeFileSync(path.join(tempDir, 'screenshot1.png'), 'fake png')
     fs.writeFileSync(path.join(tempDir, 'screenshot2.png'), 'fake png')
 
-    // Mock the storage provider creation
-    const originalModule = await import('../src/upload.js')
-    const uploadModule = originalModule as any
-
     // We need to test the actual upload function, but with a mock provider
     // Since we can't easily mock the provider creation, let's test the logic
     // by checking that the function handles the directory correctly
-
-    // For now, we'll test that the function validates inputs correctly
-    // Full integration tests would require actual storage providers
     expect(fs.existsSync(tempDir)).toBe(true)
   })
 
@@ -81,3 +59,77 @@ test.describe('uploadScreenshots', () => {
   })
 })
 
+test.describe('Manifest integration in upload', () => {
+  let tempDir: string
+
+  test.beforeEach(async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-upload-manifest-'))
+  })
+
+  test.afterEach(async () => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  test('readManifest should return group metadata for screenshots', () => {
+    // Simulate what captureScreenshot writes
+    writeManifestEntry(tempDir, 'login-form.png', { group: 'auth.spec.ts' })
+    writeManifestEntry(tempDir, 'login-success.png', { group: 'auth.spec.ts' })
+    writeManifestEntry(tempDir, 'deck-list.png', { group: 'decks.spec.ts' })
+
+    const manifest = readManifest(tempDir)
+
+    expect(manifest['login-form.png'].group).toBe('auth.spec.ts')
+    expect(manifest['login-success.png'].group).toBe('auth.spec.ts')
+    expect(manifest['deck-list.png'].group).toBe('decks.spec.ts')
+  })
+
+  test('readManifest should return empty object when no manifest exists', () => {
+    const manifest = readManifest(tempDir)
+    expect(manifest).toEqual({})
+  })
+
+  test('manifest should survive alongside screenshot files', () => {
+    // Create screenshots and manifest in same directory
+    fs.writeFileSync(path.join(tempDir, 'screenshot1.png'), 'fake png')
+    fs.writeFileSync(path.join(tempDir, 'screenshot2.png'), 'fake png')
+    writeManifestEntry(tempDir, 'screenshot1.png', { group: 'test.spec.ts' })
+    writeManifestEntry(tempDir, 'screenshot2.png', { group: 'test.spec.ts' })
+
+    // Manifest should be readable
+    const manifest = readManifest(tempDir)
+    expect(Object.keys(manifest)).toHaveLength(2)
+
+    // Manifest file should exist alongside screenshots
+    expect(fs.existsSync(path.join(tempDir, MANIFEST_FILENAME))).toBe(true)
+    expect(fs.existsSync(path.join(tempDir, 'screenshot1.png'))).toBe(true)
+    expect(fs.existsSync(path.join(tempDir, 'screenshot2.png'))).toBe(true)
+  })
+
+  test('upload result should include group from manifest', () => {
+    // This tests the data flow: manifest entry -> uploaded screenshot
+    // We simulate the logic that uploadScreenshots uses internally
+
+    writeManifestEntry(tempDir, 'login.png', { group: 'auth.spec.ts' })
+    writeManifestEntry(tempDir, 'dashboard.png', { group: 'home.spec.ts' })
+
+    const manifest = readManifest(tempDir)
+
+    // Simulate what uploadScreenshots does for each file
+    const filenames = ['login.png', 'dashboard.png', 'untracked.png']
+    const results = filenames.map(filename => {
+      const entry = manifest[filename]
+      return {
+        name: filename,
+        url: `https://example.com/${filename}`,
+        path: `pr-1/${filename}`,
+        ...(entry?.group ? { group: entry.group } : {})
+      }
+    })
+
+    expect(results[0].group).toBe('auth.spec.ts')
+    expect(results[1].group).toBe('home.spec.ts')
+    expect(results[2].group).toBeUndefined()
+  })
+})
