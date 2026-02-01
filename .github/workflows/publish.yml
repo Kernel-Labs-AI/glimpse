@@ -3,7 +3,6 @@ name: Publish to npm
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   publish:
@@ -29,4 +28,4 @@ jobs:
       - name: Run tests
         run: npx playwright test
 
-      - run: npm publish --access public --tag prerelease
+      - run: npm publish --access public
