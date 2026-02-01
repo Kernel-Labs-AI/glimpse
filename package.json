@@ -40,6 +40,10 @@
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kernel-Labs-AI/glimpse.git"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
