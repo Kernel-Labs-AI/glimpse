@@ -1,6 +1,7 @@
 import type { Page, TestInfo } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
+import { writeManifestEntry } from '../utils/manifest.js'
 
 export interface ScreenshotOptions {
   /** Screenshot name (will be used as filename) */
@@ -11,6 +12,8 @@ export interface ScreenshotOptions {
   fullPage?: boolean
   /** Playwright screenshot options */
   screenshotOptions?: Parameters<Page['screenshot']>[0]
+  /** Group/category for this screenshot (e.g. test file name, feature area) */
+  group?: string
 }
 
 /**
@@ -29,7 +32,7 @@ export const DEFAULT_SCREENSHOT_DIR = process.env.PR_SCREENSHOTS_DIR || 'test-re
  *
  * test('my test', async ({ page }) => {
  *   await page.goto('/')
- *   await captureScreenshot(page, { name: 'homepage' })
+ *   await captureScreenshot(page, { name: 'homepage', group: 'landing.spec.ts' })
  * })
  * ```
  */
@@ -38,7 +41,7 @@ export async function captureScreenshot(
   options: string | ScreenshotOptions
 ): Promise<string> {
   const opts = typeof options === 'string' ? { name: options } : options
-  const { name, outputDir = DEFAULT_SCREENSHOT_DIR, fullPage = true, screenshotOptions = {} } = opts
+  const { name, outputDir = DEFAULT_SCREENSHOT_DIR, fullPage = true, screenshotOptions = {}, group } = opts
 
   // Ensure output directory exists
   if (!fs.existsSync(outputDir)) {
@@ -58,12 +61,18 @@ export async function captureScreenshot(
     ...screenshotOptions
   })
 
+  // Write manifest entry if group is provided
+  if (group) {
+    writeManifestEntry(outputDir, filename, { group })
+  }
+
   return screenshotPath
 }
 
 /**
  * Helper to capture screenshot with test info context
  * This version integrates better with Playwright's test runner
+ * and automatically infers the group from the test file name
  *
  * @example
  * ```typescript
@@ -81,7 +90,7 @@ export async function captureScreenshotWithInfo(
   options: string | ScreenshotOptions
 ): Promise<string> {
   const opts = typeof options === 'string' ? { name: options } : options
-  const { name, outputDir = DEFAULT_SCREENSHOT_DIR, fullPage = true, screenshotOptions = {} } = opts
+  const { name, outputDir = DEFAULT_SCREENSHOT_DIR, fullPage = true, screenshotOptions = {}, group } = opts
 
   // Ensure output directory exists
   if (!fs.existsSync(outputDir)) {
@@ -109,6 +118,12 @@ export async function captureScreenshotWithInfo(
     path: screenshotPath,
     contentType: 'image/png'
   })
+
+  // Write manifest entry with group (explicit group takes priority, then infer from test file)
+  const resolvedGroup = group || (testInfo.file ? path.basename(testInfo.file) : undefined)
+  if (resolvedGroup) {
+    writeManifestEntry(outputDir, prefixedFilename, { group: resolvedGroup })
+  }
 
   return screenshotPath
 }

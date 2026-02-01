@@ -35,7 +35,7 @@ test.describe('CLI Integration Tests', () => {
       repo: 'test-repo',
     })
 
-    expect(comment).toContain('### my homepage screenshot')
+    expect(comment).toContain('<br>my homepage screenshot</a>')
   })
 })
 

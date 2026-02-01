@@ -54,4 +54,6 @@ export interface UploadedScreenshot {
   name: string
   url: string
   path: string
+  /** Group/category for this screenshot (e.g. test file name) */
+  group?: string
 }
