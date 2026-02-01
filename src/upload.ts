@@ -57,8 +57,16 @@ export async function uploadScreenshots(
 
   console.log(`Found ${screenshots.length} screenshots to upload`)
 
-  // Read manifest for group metadata
-  const manifest = readManifest(directory)
+  // Read manifests per-directory (screenshots may live in subdirectories,
+  // each with their own manifest written during capture)
+  const manifestCache = new Map<string, ReturnType<typeof readManifest>>()
+  function getManifest(screenshotPath: string) {
+    const dir = path.dirname(screenshotPath)
+    if (!manifestCache.has(dir)) {
+      manifestCache.set(dir, readManifest(dir))
+    }
+    return manifestCache.get(dir)!
+  }
 
   // Create storage provider
   const provider = createStorageProvider(storage)
@@ -74,7 +82,7 @@ export async function uploadScreenshots(
   for (const screenshotPath of screenshots.sort()) {
     const filename = path.basename(screenshotPath)
     const remotePath = generateRemotePath(pathTemplate, filename, prNumber, runId)
-    const manifestEntry = manifest[filename]
+    const manifestEntry = getManifest(screenshotPath)[filename]
 
     try {
       const url = await provider.upload(screenshotPath, remotePath)
