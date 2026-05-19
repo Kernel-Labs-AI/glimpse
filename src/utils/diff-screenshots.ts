@@ -39,12 +39,14 @@ type CompareImages = (
   options?: ODiffOptions & { timeout?: number }
 ) => Promise<ODiffResult>
 
+type DownloadBaseline = (remotePath: string) => Promise<Buffer | undefined>
+
 interface SelectScreenshotsOptions {
   directory: string
   screenshots: string[]
   diff?: ScreenshotDiffOptions
   compareImages?: CompareImages
-  downloadBaseline?: (remotePath: string) => Promise<Buffer | undefined>
+  downloadBaseline?: DownloadBaseline
 }
 
 interface SelectedScreenshots {
@@ -142,6 +144,30 @@ function getDiffRelativePath(relativeScreenshotPath: string): string {
   return normalizeRelativePath(path.join(parsed.dir, `${parsed.name}.diff.png`))
 }
 
+function createBaselineDownloader(
+  diff: NormalizedScreenshotDiffOptions,
+  downloadBaseline?: DownloadBaseline
+): DownloadBaseline | undefined {
+  if (!diff.baselineStorage) {
+    return undefined
+  }
+
+  if (downloadBaseline) {
+    return downloadBaseline
+  }
+
+  if (!diff.baselineStorage.storage) {
+    throw new Error('baselineStorage.storage is required for remote baseline downloads')
+  }
+
+  const provider = createStorageProvider(diff.baselineStorage.storage)
+  if (!provider.download) {
+    throw new Error(`Storage provider ${diff.baselineStorage.storage.type} does not support downloads`)
+  }
+
+  return provider.download.bind(provider)
+}
+
 async function writeRemoteBaseline({
   diff,
   relativePath,
@@ -151,7 +177,7 @@ async function writeRemoteBaseline({
   diff: NormalizedScreenshotDiffOptions
   relativePath: string
   outputDirectory: string
-  downloadBaseline?: (remotePath: string) => Promise<Buffer | undefined>
+  downloadBaseline: DownloadBaseline
 }): Promise<string | undefined> {
   if (!diff.baselineStorage) {
     return undefined
@@ -166,18 +192,7 @@ async function writeRemoteBaseline({
     branch: diff.baselineStorage.branch,
   })
 
-  const download = downloadBaseline || (() => {
-    if (!diff.baselineStorage?.storage) {
-      throw new Error('baselineStorage.storage is required for remote baseline downloads')
-    }
-    const provider = createStorageProvider(diff.baselineStorage.storage)
-    if (!provider.download) {
-      throw new Error(`Storage provider ${diff.baselineStorage.storage.type} does not support downloads`)
-    }
-    return provider.download.bind(provider)
-  })()
-
-  const baselineBuffer = await download(remotePath)
+  const baselineBuffer = await downloadBaseline(remotePath)
   if (!baselineBuffer) {
     return undefined
   }
@@ -241,6 +256,7 @@ export async function selectScreenshotsForUpload(
       noFailOnFsErrors: true,
     }
     const candidates: ScreenshotUploadCandidate[] = []
+    const downloadBaseline = createBaselineDownloader(diff, options.downloadBaseline)
 
     for (const screenshotPath of sortedScreenshots) {
       const relativePath = normalizeRelativePath(path.relative(options.directory, screenshotPath))
@@ -251,7 +267,7 @@ export async function selectScreenshotsForUpload(
               diff,
               relativePath,
               outputDirectory: baselineDownloadDirectory!,
-              downloadBaseline: options.downloadBaseline,
+              downloadBaseline: downloadBaseline!,
             })
           : undefined
 

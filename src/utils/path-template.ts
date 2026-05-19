@@ -7,6 +7,8 @@ export interface PathTemplateValues {
   branch?: string
 }
 
+const generatedRunId = String(Date.now())
+
 /**
  * Generate a storage path from a template.
  *
@@ -17,12 +19,12 @@ export function generatePathFromTemplate(
   values: PathTemplateValues
 ): string {
   const replacements: Record<string, string> = {
-    pr: String(values.prNumber || 'unknown'),
-    runId: String(values.runId || Date.now()),
+    pr: String(values.prNumber ?? 'unknown'),
+    runId: String(values.runId ?? generatedRunId),
     filename: values.filename,
-    relativePath: values.relativePath || values.filename,
-    commit: String(values.commitSha || 'unknown'),
-    branch: String(values.branch || 'unknown'),
+    relativePath: values.relativePath ?? values.filename,
+    commit: String(values.commitSha ?? 'unknown'),
+    branch: String(values.branch ?? 'unknown'),
   }
 
   return template.replace(/\{(pr|runId|filename|relativePath|commit|branch)\}/g, (_match, key: string) => {

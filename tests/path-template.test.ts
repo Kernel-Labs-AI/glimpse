@@ -24,4 +24,15 @@ test.describe('generatePathFromTemplate', () => {
       filename: 'homepage.png',
     })).toBe('screens/homepage.png')
   })
+
+  test('uses a stable generated runId fallback when runId is omitted', () => {
+    const first = generatePathFromTemplate('run-{runId}/a.png', {
+      filename: 'a.png',
+    })
+    const second = generatePathFromTemplate('run-{runId}/b.png', {
+      filename: 'b.png',
+    })
+
+    expect(first.replace('/a.png', '')).toBe(second.replace('/b.png', ''))
+  })
 })
