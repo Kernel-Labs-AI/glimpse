@@ -22,9 +22,34 @@ export interface GitHubCommentOptions {
  */
 function formatDisplayName(name: string): string {
   return name
+    .replace('.diff.png', '')
     .replace('.png', '')
     .replace(/-/g, ' ')
     .replace(/_/g, ' ')
+}
+
+function formatDiffPercentage(percentage: number): string {
+  const precision = percentage < 1 ? 2 : 1
+  return `${percentage.toFixed(precision).replace(/\.0$/, '')}%`
+}
+
+function formatDiffMetadata(screenshot: UploadedScreenshot): string | undefined {
+  if (!screenshot.diff) return undefined
+
+  if (screenshot.diff.reason === 'pixel-diff' && screenshot.diff.percentage !== undefined) {
+    return `${formatDiffPercentage(screenshot.diff.percentage)} diff`
+  }
+
+  if (screenshot.diff.reason === 'layout-diff') {
+    return 'layout changed'
+  }
+
+  return 'new screenshot'
+}
+
+function formatItemCount(count: number, hasDiffMetadata: boolean): string {
+  const noun = hasDiffMetadata ? 'change' : 'screenshot'
+  return `${count} ${noun}${count !== 1 ? 's' : ''}`
 }
 
 /**
@@ -40,8 +65,12 @@ function generateThumbnailGrid(screenshots: UploadedScreenshot[]): string {
   for (let i = 0; i < screenshots.length; i += 3) {
     const row = screenshots.slice(i, i + 3)
     const cells = row.map(s => {
-      const displayName = formatDisplayName(s.name)
-      return `<a href="${s.url}"><img src="${s.url}" width="280"><br>${displayName}</a>`
+      const displayName = formatDisplayName(s.displayName || s.sourceName || s.name)
+      const diffMetadata = formatDiffMetadata(s)
+      const caption = diffMetadata
+        ? `${displayName}<br><sub>${diffMetadata}</sub>`
+        : displayName
+      return `<a href="${s.url}"><img src="${s.url}" width="280"><br>${caption}</a>`
     })
     // Pad with empty cells if needed
     while (cells.length < 3) {
@@ -61,11 +90,21 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
   const { screenshots, runId, repositoryUrl } = options
 
   let commentBody = '## 📸 UI Screenshots\n\n'
-  commentBody += 'Automated screenshots from the latest build:\n\n'
+  const hasDiffMetadata = screenshots.some(s => s.diff)
+
+  if (screenshots.length === 0) {
+    commentBody += 'No screenshots or diffs were selected for this run.\n'
+  } else if (hasDiffMetadata) {
+    commentBody += 'Showing the highest-signal visual changes from the latest build:\n\n'
+  } else {
+    commentBody += 'Automated screenshots from the latest build:\n\n'
+  }
 
   const hasGroups = screenshots.some(s => s.group)
 
-  if (hasGroups) {
+  if (screenshots.length === 0) {
+    // Keep the comment compact when all screenshots were filtered out.
+  } else if (hasGroups) {
     // Group screenshots by their group field
     const groups = new Map<string, UploadedScreenshot[]>()
     for (const screenshot of screenshots) {
@@ -78,8 +117,9 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
 
     for (const [group, groupScreenshots] of groups) {
       const count = groupScreenshots.length
+      const groupHasDiffMetadata = groupScreenshots.some(s => s.diff)
       commentBody += `<details>\n`
-      commentBody += `<summary><strong>${group}</strong> (${count} screenshot${count !== 1 ? 's' : ''})</summary>\n\n`
+      commentBody += `<summary><strong>${group}</strong> (${formatItemCount(count, groupHasDiffMetadata)})</summary>\n\n`
       commentBody += generateThumbnailGrid(groupScreenshots)
       commentBody += '\n</details>\n\n'
     }
@@ -112,12 +152,6 @@ export async function postToGitHub(
 ): Promise<void> {
   const { screenshots, prNumber, owner, repo } = options
 
-  if (screenshots.length === 0) {
-    throw new Error('No screenshots provided')
-  }
-
-  const commentBody = generateCommentBody(options)
-
   // Find existing comment
   const { data: comments } = await githubClient.rest.issues.listComments({
     owner,
@@ -129,6 +163,13 @@ export async function postToGitHub(
     comment.user.type === 'Bot' &&
     comment.body.includes('📸 UI Screenshots')
   )
+
+  if (screenshots.length === 0 && !botComment) {
+    console.log('✓ No screenshots selected; skipping PR comment')
+    return
+  }
+
+  const commentBody = generateCommentBody(options)
 
   // Update or create comment
   if (botComment) {
