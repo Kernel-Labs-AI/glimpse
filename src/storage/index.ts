@@ -47,8 +47,6 @@ export interface VercelBlobConfig {
   type: 'vercel-blob'
   /** Vercel Blob read/write token. Defaults to VERCEL_BLOB_READ_WRITE_TOKEN or BLOB_READ_WRITE_TOKEN. */
   token?: string
-  /** Blob store access mode. Defaults to public. */
-  access?: 'public' | 'private'
 }
 
 export type StorageConfig = SupabaseConfig | S3Config | VercelBlobConfig

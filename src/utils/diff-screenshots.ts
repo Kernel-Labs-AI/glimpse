@@ -1,7 +1,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import type { ODiffOptions, ODiffResult } from 'odiff-bin'
+import { ODiffServer, type ODiffOptions, type ODiffResult } from 'odiff-bin'
 import type {
   ScreenshotDiffOptions,
   ScreenshotUploadMode,
@@ -40,6 +40,7 @@ type CompareImages = (
 ) => Promise<ODiffResult>
 
 type DownloadBaseline = (remotePath: string) => Promise<Buffer | undefined>
+type StoppableODiffServer = ODiffServer & { exiting?: boolean }
 
 interface SelectScreenshotsOptions {
   directory: string
@@ -128,10 +129,14 @@ function compareByLargestDiff(a: ScreenshotUploadCandidate, b: ScreenshotUploadC
 }
 
 async function createDefaultCompareImages(): Promise<{ compareImages: CompareImages; stop: () => void }> {
-  const { compare } = await import('odiff-bin')
+  const server = new ODiffServer()
   return {
-    compareImages: compare,
-    stop: () => {},
+    compareImages: server.compare.bind(server),
+    stop: () => {
+      server.stop()
+      // odiff-bin resets this before its async exit handler runs, causing a false warning on normal shutdown.
+      ;(server as StoppableODiffServer).exiting = true
+    },
   }
 }
 

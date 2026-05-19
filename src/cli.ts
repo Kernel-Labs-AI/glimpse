@@ -33,12 +33,6 @@ function readGitHubEvent(): any | undefined {
   }
 }
 
-function resolveBlobAccess(value: string | undefined): 'public' | 'private' {
-  if (!value) return 'public'
-  if (value === 'public' || value === 'private') return value
-  throw new Error('VERCEL_BLOB_ACCESS must be either "public" or "private"')
-}
-
 program
   .name('glimpse')
   .description('Upload Playwright screenshots to storage and generate PR comments')
@@ -119,7 +113,6 @@ program
         storageConfig = {
           type: 'vercel-blob',
           token,
-          access: resolveBlobAccess(process.env.VERCEL_BLOB_ACCESS)
         }
       } else {
         console.error(`Error: Unknown storage type: ${storageType}`)

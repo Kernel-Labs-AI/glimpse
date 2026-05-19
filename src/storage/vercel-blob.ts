@@ -22,11 +22,9 @@ function isNotFoundError(error: any): boolean {
 
 export class VercelBlobStorage implements StorageProvider {
   private token?: string
-  private access: 'public' | 'private'
 
   constructor(private config: VercelBlobConfig) {
     this.token = config.token || process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN
-    this.access = config.access || 'public'
   }
 
   async upload(filePath: string, remotePath: string): Promise<string> {
@@ -40,7 +38,7 @@ export class VercelBlobStorage implements StorageProvider {
     console.log(`Uploading ${remotePath} (${fileSizeMB}MB) to Vercel Blob...`)
 
     const blob = await put(remotePath, fileBuffer, {
-      access: this.access,
+      access: 'public',
       contentType: 'image/png',
       token: this.token,
       addRandomSuffix: false,
@@ -58,7 +56,7 @@ export class VercelBlobStorage implements StorageProvider {
 
     try {
       const result = await get(remotePath, {
-        access: this.access,
+        access: 'public',
         token: this.token,
       })
 

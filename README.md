@@ -240,7 +240,8 @@ S3 environment variables:
 Vercel Blob environment variables:
 
 - `VERCEL_BLOB_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN`: required
-- `VERCEL_BLOB_ACCESS`: optional, `public` or `private`; defaults to `public`
+
+Glimpse uploads Vercel Blob screenshots with public access so GitHub can render them in PR comments.
 
 For S3-compatible services:
 
