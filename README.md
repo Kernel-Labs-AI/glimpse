@@ -184,7 +184,7 @@ If every screenshot is below the threshold, `upload` writes an empty JSON array.
 
 Storage-backed diffs require baseline screenshots to already exist in storage. In CI, those screenshots usually are not in the repository, so you need a separate workflow that runs on the target branch and uploads screenshots for each commit.
 
-The PR workflow then downloads the screenshots for the pull request's base commit and compares the current PR screenshots against them. If this baseline upload workflow is not set up, Glimpse has nothing to diff against and will treat screenshots as new images.
+The PR workflow then downloads the screenshots for the pull request's base commit and compares the current PR screenshots against them. If this baseline upload workflow is not set up, Glimpse has nothing to diff against and will treat screenshots as new images instead of failing the CI job.
 
 A push workflow for the target branch should upload screenshots using a commit-addressed path:
 
@@ -218,7 +218,7 @@ npx glimpse upload \
 
 This downloads each baseline image from the rendered baseline path, runs odiff locally in CI, and uploads only selected screenshots or generated diff images.
 
-If the target branch has no stored screenshot for a path, Glimpse treats the current screenshot as a new high-signal image and includes it.
+If the target branch has no stored screenshot for a path, Glimpse treats the current screenshot as a new high-signal image and includes it. The same fallback applies when diff mode is enabled without a usable baseline source: Glimpse skips odiff and uploads the current screenshots, marked as missing baselines.
 
 ## Storage Configuration
 

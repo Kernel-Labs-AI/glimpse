@@ -178,10 +178,6 @@ program
         odiffThreshold !== undefined
       )
 
-      if (!diffBaseDirectory && !diffBaseFromStorage && hasDiffOptions) {
-        throw new Error('Diff options require --diff-base-directory or --diff-base-from-storage')
-      }
-
       if (diffBaseDirectory && diffBaseFromStorage) {
         throw new Error('Use either --diff-base-directory or --diff-base-from-storage, not both')
       }

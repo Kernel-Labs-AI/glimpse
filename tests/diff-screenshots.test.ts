@@ -239,4 +239,51 @@ test.describe('selectScreenshotsForUpload', () => {
     expect(selection.candidates[0].diff?.reason).toBe('missing-baseline')
     expect(selection.candidates[0].uploadPath).toBe(screenshotPath)
   })
+
+  test('does not fail when diff mode has no configured baseline source', async () => {
+    const screenshotPath = path.join(currentDir, 'new.png')
+    fs.writeFileSync(screenshotPath, 'current')
+
+    const selection = await selectScreenshotsForUpload({
+      directory: currentDir,
+      screenshots: [screenshotPath],
+      diff: {
+        uploadMode: 'diffs',
+        minDiffPercentage: 10,
+      },
+      compareImages: async () => {
+        throw new Error('should not compare without a baseline')
+      },
+    })
+
+    expect(selection.candidates).toHaveLength(1)
+    expect(selection.candidates[0]).toMatchObject({
+      name: 'new.png',
+      kind: 'screenshot',
+      diff: {
+        reason: 'missing-baseline',
+      },
+    })
+  })
+
+  test('does not fail when the configured baseline directory is missing', async () => {
+    const screenshotPath = path.join(currentDir, 'new.png')
+    fs.writeFileSync(screenshotPath, 'current')
+
+    const selection = await selectScreenshotsForUpload({
+      directory: currentDir,
+      screenshots: [screenshotPath],
+      diff: {
+        baselineDirectory: path.join(tempDir, 'missing-baseline-dir'),
+        uploadMode: 'diffs',
+      },
+      compareImages: async () => {
+        throw new Error('should not compare without a baseline')
+      },
+    })
+
+    expect(selection.candidates).toHaveLength(1)
+    expect(selection.candidates[0].diff?.reason).toBe('missing-baseline')
+    expect(selection.candidates[0].uploadPath).toBe(screenshotPath)
+  })
 })

@@ -69,16 +69,12 @@ function validateDiffOptions(diff: ScreenshotDiffOptions): NormalizedScreenshotD
     throw new Error('minDiffPercentage must be a number between 0 and 100')
   }
 
-  if (!diff.baselineDirectory && !diff.baselineStorage) {
-    throw new Error('Diff options require either baselineDirectory or baselineStorage')
-  }
-
   if (diff.baselineDirectory && diff.baselineStorage) {
     throw new Error('Diff options must not set both baselineDirectory and baselineStorage')
   }
 
   if (diff.baselineDirectory && !fs.existsSync(diff.baselineDirectory)) {
-    throw new Error(`Diff baseline directory ${diff.baselineDirectory} does not exist`)
+    console.warn(`Diff baseline directory ${diff.baselineDirectory} does not exist; treating screenshots as new`)
   }
 
   return {
@@ -250,12 +246,14 @@ export async function selectScreenshotsForUpload(
       const relativePath = normalizeRelativePath(path.relative(options.directory, screenshotPath))
       const baselinePath = diff.baselineDirectory
         ? path.join(diff.baselineDirectory, relativePath)
-        : await writeRemoteBaseline({
-            diff,
-            relativePath,
-            outputDirectory: baselineDownloadDirectory!,
-            downloadBaseline: options.downloadBaseline,
-          })
+        : diff.baselineStorage
+          ? await writeRemoteBaseline({
+              diff,
+              relativePath,
+              outputDirectory: baselineDownloadDirectory!,
+              downloadBaseline: options.downloadBaseline,
+            })
+          : undefined
 
       if (!baselinePath || !fs.existsSync(baselinePath)) {
         candidates.push(
