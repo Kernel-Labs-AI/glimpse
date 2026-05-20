@@ -10,7 +10,7 @@ It can post either captured screenshots or generated visual diffs. Diff filterin
 npm install --save-dev @kernel-labs/glimpse
 ```
 
-Glimpse expects Node 20 or newer.
+Glimpse expects Node 22 or newer.
 
 ## Capture Screenshots
 
@@ -98,7 +98,7 @@ steps:
 
   - uses: actions/setup-node@v4
     with:
-      node-version: '20.x'
+      node-version: '22.x'
 
   - run: npm ci
   - run: npx playwright install --with-deps chromium
