@@ -1,6 +1,6 @@
 /**
  * Glimpse
- * Upload Playwright screenshots to Supabase/S3 and post to GitHub PR comments
+ * Upload Playwright screenshots to Supabase, S3, or Vercel Blob and post to GitHub PR comments
  */
 
 // Export main functionality
@@ -13,8 +13,15 @@ export type {
   StorageConfig,
   SupabaseConfig,
   S3Config,
+  VercelBlobConfig,
   UploadOptions,
-  UploadedScreenshot
+  UploadedScreenshot,
+  ScreenshotDiffOptions,
+  ScreenshotBaselineStorageOptions,
+  ScreenshotUploadMode,
+  UploadedScreenshotDiff,
+  UploadedScreenshotDiffReason,
+  UploadedScreenshotKind
 } from './storage/index.js'
 
 export type { GitHubCommentOptions } from './github/comment.js'
@@ -22,6 +29,7 @@ export type { GitHubCommentOptions } from './github/comment.js'
 // Export storage providers (for advanced usage)
 export { SupabaseStorage } from './storage/supabase.js'
 export { S3Storage } from './storage/s3.js'
+export { VercelBlobStorage } from './storage/vercel-blob.js'
 
 // Export utilities
 export { findScreenshots } from './utils/find-screenshots.js'

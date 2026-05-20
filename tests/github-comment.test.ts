@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { generateCommentBody } from '../src/github/comment.js'
+import { generateCommentBody, postToGitHub } from '../src/github/comment.js'
 import type { UploadedScreenshot } from '../src/storage/index.js'
 
 const baseOptions = {
@@ -196,7 +196,7 @@ test.describe('generateCommentBody', () => {
       const comment = generateCommentBody({ ...baseOptions, screenshots: [] })
 
       expect(comment).toContain('## 📸 UI Screenshots')
-      expect(comment).toContain('Automated screenshots from the latest build')
+      expect(comment).toContain('No screenshots or diffs were selected for this run')
     })
 
     test('should handle special characters in screenshot names', () => {
@@ -219,5 +219,124 @@ test.describe('generateCommentBody', () => {
 
       expect(comment).toContain('<strong>tests/e2e/auth.spec.ts</strong>')
     })
+  })
+
+  test.describe('diff metadata', () => {
+    test('should show compact diff percentages without exposing diff filenames', () => {
+      const screenshots: UploadedScreenshot[] = [
+        {
+          name: 'homepage.diff.png',
+          sourceName: 'homepage.png',
+          displayName: 'homepage.png',
+          url: 'https://example.com/homepage.diff.png',
+          path: 'homepage.diff.png',
+          kind: 'diff',
+          diff: {
+            reason: 'pixel-diff',
+            percentage: 12.5,
+            count: 500,
+          },
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots })
+
+      expect(comment).toContain('Showing the highest-signal visual changes')
+      expect(comment).toContain('<br>homepage<br><sub>12.5% diff</sub></a>')
+      expect(comment).not.toContain('<br>homepage diff')
+    })
+
+    test('should describe layout changes and new screenshots', () => {
+      const screenshots: UploadedScreenshot[] = [
+        {
+          name: 'layout.png',
+          url: 'https://example.com/layout.png',
+          path: 'layout.png',
+          diff: { reason: 'layout-diff' },
+        },
+        {
+          name: 'new.png',
+          url: 'https://example.com/new.png',
+          path: 'new.png',
+          diff: { reason: 'missing-baseline' },
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots })
+
+      expect(comment).toContain('<sub>layout changed</sub>')
+      expect(comment).toContain('<sub>new screenshot</sub>')
+    })
+
+    test('should count grouped diff entries as changes', () => {
+      const screenshots: UploadedScreenshot[] = [
+        {
+          name: 'a.diff.png',
+          url: 'https://example.com/a.diff.png',
+          path: 'a.diff.png',
+          group: 'auth.spec.ts',
+          diff: { reason: 'pixel-diff', percentage: 1.25 },
+        },
+        {
+          name: 'b.diff.png',
+          url: 'https://example.com/b.diff.png',
+          path: 'b.diff.png',
+          group: 'auth.spec.ts',
+          diff: { reason: 'pixel-diff', percentage: 2.5 },
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots })
+
+      expect(comment).toContain('<summary><strong>auth.spec.ts</strong> (2 changes)</summary>')
+    })
+  })
+})
+
+test.describe('postToGitHub', () => {
+  test('should skip creating a comment when no screenshots are selected and no bot comment exists', async () => {
+    const calls: string[] = []
+    const githubClient = {
+      rest: {
+        issues: {
+          listComments: async () => ({ data: [] }),
+          updateComment: async () => calls.push('update'),
+          createComment: async () => calls.push('create'),
+        },
+      },
+    }
+
+    await postToGitHub({ ...baseOptions, screenshots: [] }, githubClient)
+
+    expect(calls).toEqual([])
+  })
+
+  test('should update an existing bot comment when a later run selects no screenshots', async () => {
+    let updatedBody = ''
+    const githubClient = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 42,
+                user: { type: 'Bot' },
+                body: '## 📸 UI Screenshots\n\nold screenshots',
+              },
+            ],
+          }),
+          updateComment: async ({ body }: { body: string }) => {
+            updatedBody = body
+          },
+          createComment: async () => {
+            throw new Error('should not create')
+          },
+        },
+      },
+    }
+
+    await postToGitHub({ ...baseOptions, screenshots: [] }, githubClient)
+
+    expect(updatedBody).toContain('No screenshots or diffs were selected for this run')
   })
 })

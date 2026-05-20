@@ -2,30 +2,69 @@
 
 import { Command } from 'commander'
 import fs from 'fs'
-import path from 'path'
 import { uploadScreenshots } from './upload.js'
 import { generateCommentBody } from './github/comment.js'
 import type { StorageConfig } from './storage/index.js'
+import type { ODiffOptions } from 'odiff-bin'
 
 const program = new Command()
 
+function parseNumberOption(value: string | undefined, name: string, min: number, max: number): number | undefined {
+  if (value === undefined) return undefined
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${name} must be a number between ${min} and ${max}`)
+  }
+  return parsed
+}
+
+function readBooleanEnv(name: string): boolean {
+  return process.env[name] === 'true' || process.env[name] === '1'
+}
+
+function readGitHubEvent(): any | undefined {
+  const eventPath = process.env.GITHUB_EVENT_PATH
+  if (!eventPath || !fs.existsSync(eventPath)) return undefined
+
+  try {
+    return JSON.parse(fs.readFileSync(eventPath, 'utf8'))
+  } catch {
+    return undefined
+  }
+}
+
 program
   .name('glimpse')
-  .description('Upload Playwright screenshots to Supabase/S3 and generate PR comments')
+  .description('Upload Playwright screenshots to storage and generate PR comments')
   .version('0.1.0')
 
 program
   .command('upload')
   .description('Upload screenshots to storage')
   .requiredOption('-d, --directory <path>', 'Directory containing screenshots')
-  .requiredOption('-s, --storage <type>', 'Storage type: supabase or s3')
+  .requiredOption('-s, --storage <type>', 'Storage type: supabase, s3, or vercel-blob')
   .option('-p, --pr <number>', 'PR number')
   .option('-r, --run-id <id>', 'CI run ID')
+  .option('--commit <sha>', 'Commit SHA for upload path templates')
+  .option('--branch <name>', 'Branch name for upload path templates')
   .option('-t, --path-template <template>', 'Path template for uploaded files')
   .option('-o, --output <path>', 'Output file for screenshot URLs (JSON)')
+  .option('--diff-base-directory <path>', 'Baseline screenshot directory for visual diff comparisons')
+  .option('--diff-base-from-storage', 'Download baseline screenshots from storage')
+  .option('--diff-base-path-template <template>', 'Storage path template for baseline screenshots')
+  .option('--diff-base-pr <number>', 'PR number for baseline storage path templates')
+  .option('--diff-base-run-id <id>', 'Run ID for baseline storage path templates')
+  .option('--diff-base-commit <sha>', 'Commit SHA for baseline storage path templates')
+  .option('--diff-base-branch <name>', 'Branch name for baseline storage path templates')
+  .option('--diff-mode <mode>', 'When diffing, upload changed screenshots or generated diffs: screenshots or diffs')
+  .option('--post-diffs', 'Shortcut for --diff-mode diffs')
+  .option('--min-diff-percentage <percentage>', 'Only upload pixel diffs at or above this odiff diffPercentage (0-100)')
+  .option('--odiff-threshold <threshold>', 'Color-difference threshold passed to odiff (0-1, lower is more precise)')
+  .option('--diff-output-directory <path>', 'Directory where generated diff images should be written')
   .action(async (options) => {
     try {
       const { directory, storage: storageType, pr, runId, pathTemplate, output } = options
+      const githubEvent = readGitHubEvent()
 
       // Build storage config from environment variables
       let storageConfig: StorageConfig
@@ -63,19 +102,121 @@ program
           endpoint: process.env.S3_ENDPOINT,
           publicRead: process.env.S3_PUBLIC_READ !== 'false'
         }
+      } else if (storageType === 'vercel-blob') {
+        const token = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN
+
+        if (!token) {
+          console.error('Error: VERCEL_BLOB_READ_WRITE_TOKEN (or BLOB_READ_WRITE_TOKEN) environment variable is required')
+          process.exit(1)
+        }
+
+        storageConfig = {
+          type: 'vercel-blob',
+          token,
+        }
       } else {
         console.error(`Error: Unknown storage type: ${storageType}`)
-        console.error('Supported types: supabase, s3')
+        console.error('Supported types: supabase, s3, vercel-blob')
         process.exit(1)
+      }
+
+      const prNumber = pr || process.env.PR_NUMBER
+      const resolvedRunId = runId || process.env.RUN_ID || process.env.GITHUB_RUN_ID
+      const commitSha = options.commit ||
+        process.env.GLIMPSE_COMMIT_SHA ||
+        githubEvent?.pull_request?.head?.sha ||
+        process.env.GITHUB_SHA
+      const branch = options.branch ||
+        process.env.GLIMPSE_BRANCH ||
+        githubEvent?.pull_request?.head?.ref ||
+        process.env.GITHUB_HEAD_REF ||
+        process.env.GITHUB_REF_NAME
+      const diffBaseDirectory = options.diffBaseDirectory || process.env.DIFF_BASE_DIRECTORY
+      const diffBaseFromStorage = options.diffBaseFromStorage || readBooleanEnv('DIFF_BASE_FROM_STORAGE')
+      const diffBasePathTemplate = options.diffBasePathTemplate ||
+        process.env.DIFF_BASE_PATH_TEMPLATE ||
+        pathTemplate ||
+        'pr-{pr}/run-{runId}/{filename}'
+      const diffBaseCommit = options.diffBaseCommit ||
+        process.env.GLIMPSE_DIFF_BASE_COMMIT ||
+        githubEvent?.pull_request?.base?.sha ||
+        process.env.GITHUB_BASE_SHA
+      const diffBaseBranch = options.diffBaseBranch ||
+        process.env.GLIMPSE_DIFF_BASE_BRANCH ||
+        githubEvent?.pull_request?.base?.ref ||
+        process.env.GITHUB_BASE_REF
+      const diffBasePr = options.diffBasePr || process.env.DIFF_BASE_PR || prNumber
+      const diffBaseRunId = options.diffBaseRunId || process.env.DIFF_BASE_RUN_ID
+      const minDiffPercentage = parseNumberOption(
+        options.minDiffPercentage || process.env.MIN_DIFF_PERCENTAGE,
+        'minDiffPercentage',
+        0,
+        100
+      )
+      const odiffThreshold = parseNumberOption(
+        options.odiffThreshold || process.env.ODIFF_THRESHOLD,
+        'odiffThreshold',
+        0,
+        1
+      )
+      const postDiffs = options.postDiffs || readBooleanEnv('POST_DIFFS')
+      const diffMode = postDiffs
+        ? 'diffs'
+        : options.diffMode || process.env.DIFF_MODE
+      const hasDiffOptions = Boolean(
+        diffBaseDirectory ||
+        diffBaseFromStorage ||
+        diffMode ||
+        minDiffPercentage !== undefined ||
+        odiffThreshold !== undefined
+      )
+
+      if (diffBaseDirectory && diffBaseFromStorage) {
+        throw new Error('Use either --diff-base-directory or --diff-base-from-storage, not both')
+      }
+
+      if (diffMode && diffMode !== 'screenshots' && diffMode !== 'diffs') {
+        throw new Error('diffMode must be either "screenshots" or "diffs"')
+      }
+
+      const odiffOptions: ODiffOptions = {}
+      if (odiffThreshold !== undefined) {
+        odiffOptions.threshold = odiffThreshold
       }
 
       // Upload screenshots
       const screenshots = await uploadScreenshots({
         directory,
         storage: storageConfig,
-        prNumber: pr || process.env.PR_NUMBER,
-        runId: runId || process.env.RUN_ID,
-        pathTemplate
+        prNumber,
+        runId: resolvedRunId,
+        commitSha,
+        branch,
+        pathTemplate,
+        ...(hasDiffOptions
+          ? {
+              diff: {
+                ...(diffBaseDirectory ? { baselineDirectory: diffBaseDirectory } : {}),
+                ...(diffBaseFromStorage
+                  ? {
+                      baselineStorage: {
+                        pathTemplate: diffBasePathTemplate,
+                        prNumber: diffBasePr,
+                        ...(diffBaseRunId ? { runId: diffBaseRunId } : {}),
+                        ...(diffBaseCommit ? { commitSha: diffBaseCommit } : {}),
+                        ...(diffBaseBranch ? { branch: diffBaseBranch } : {}),
+                      },
+                    }
+                  : {}),
+                uploadMode: diffMode || 'screenshots',
+                ...(minDiffPercentage !== undefined ? { minDiffPercentage } : {}),
+                ...(options.diffOutputDirectory || process.env.DIFF_OUTPUT_DIRECTORY
+                  ? { diffOutputDirectory: options.diffOutputDirectory || process.env.DIFF_OUTPUT_DIRECTORY }
+                  : {}),
+                ...(Object.keys(odiffOptions).length > 0 ? { odiffOptions } : {}),
+              },
+            }
+          : {})
       })
 
       // Write output file if specified

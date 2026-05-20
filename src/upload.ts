@@ -1,38 +1,10 @@
 import path from 'path'
-import { StorageProvider, UploadOptions, UploadedScreenshot } from './storage/index.js'
-import { SupabaseStorage } from './storage/supabase.js'
-import { S3Storage } from './storage/s3.js'
+import { UploadOptions, UploadedScreenshot } from './storage/index.js'
+import { createStorageProvider } from './storage/provider.js'
 import { findScreenshots } from './utils/find-screenshots.js'
 import { readManifest } from './utils/manifest.js'
-
-/**
- * Create a storage provider based on the configuration
- */
-function createStorageProvider(config: UploadOptions['storage']): StorageProvider {
-  switch (config.type) {
-    case 'supabase':
-      return new SupabaseStorage(config)
-    case 's3':
-      return new S3Storage(config)
-    default:
-      throw new Error(`Unknown storage type: ${(config as any).type}`)
-  }
-}
-
-/**
- * Generate remote path from template
- */
-function generateRemotePath(
-  template: string,
-  filename: string,
-  prNumber?: string | number,
-  runId?: string | number
-): string {
-  return template
-    .replace('{pr}', String(prNumber || 'unknown'))
-    .replace('{runId}', String(runId || Date.now()))
-    .replace('{filename}', filename)
-}
+import { selectScreenshotsForUpload } from './utils/diff-screenshots.js'
+import { generatePathFromTemplate } from './utils/path-template.js'
 
 /**
  * Upload screenshots to the configured storage provider
@@ -45,7 +17,9 @@ export async function uploadScreenshots(
     storage,
     pathTemplate = 'pr-{pr}/run-{runId}/{filename}',
     prNumber,
-    runId
+    runId,
+    commitSha,
+    branch
   } = options
 
   // Find all screenshots
@@ -55,7 +29,11 @@ export async function uploadScreenshots(
     throw new Error(`No screenshots found in ${directory}`)
   }
 
-  console.log(`Found ${screenshots.length} screenshots to upload`)
+  console.log(
+    options.diff
+      ? `Found ${screenshots.length} screenshots to compare`
+      : `Found ${screenshots.length} screenshots to upload`
+  )
 
   // Read manifests per-directory (screenshots may live in subdirectories,
   // each with their own manifest written during capture)
@@ -68,34 +46,64 @@ export async function uploadScreenshots(
     return manifestCache.get(dir)!
   }
 
+  const diff = options.diff?.baselineStorage && !options.diff.baselineStorage.storage
+    ? {
+        ...options.diff,
+        baselineStorage: {
+          ...options.diff.baselineStorage,
+          storage,
+        },
+      }
+    : options.diff
+
+  const selection = await selectScreenshotsForUpload({ directory, screenshots, diff })
+
+  if (selection.candidates.length === 0) {
+    console.log('\n✓ No screenshots exceeded the configured diff threshold')
+    selection.cleanup?.()
+    return []
+  }
+
   // Create storage provider
   const provider = createStorageProvider(storage)
 
-  // Initialize provider if needed
-  if (provider.initialize) {
-    await provider.initialize()
-  }
-
   const uploadedScreenshots: UploadedScreenshot[] = []
 
-  // Upload each screenshot
-  for (const screenshotPath of screenshots.sort()) {
-    const filename = path.basename(screenshotPath)
-    const remotePath = generateRemotePath(pathTemplate, filename, prNumber, runId)
-    const manifestEntry = getManifest(screenshotPath)[filename]
-
-    try {
-      const url = await provider.upload(screenshotPath, remotePath)
-      uploadedScreenshots.push({
-        name: filename,
-        url,
-        path: remotePath,
-        ...(manifestEntry?.group ? { group: manifestEntry.group } : {})
+  try {
+    // Upload selected screenshots or generated diffs
+    for (const candidate of selection.candidates) {
+      const sourceFilename = path.basename(candidate.sourcePath)
+      const remotePath = generatePathFromTemplate(pathTemplate, {
+        filename: candidate.name,
+        relativePath: candidate.relativePath,
+        prNumber,
+        runId,
+        commitSha,
+        branch,
       })
-    } catch (error: any) {
-      console.error(`Failed to upload ${filename}:`, error.message)
-      // Continue with other files
+      const manifestEntry = getManifest(candidate.sourcePath)[sourceFilename]
+
+      try {
+        const url = await provider.upload(candidate.uploadPath, remotePath)
+        uploadedScreenshots.push({
+          name: candidate.name,
+          url,
+          path: remotePath,
+          ...(manifestEntry?.group ? { group: manifestEntry.group } : {}),
+          ...(candidate.kind ? { kind: candidate.kind } : {}),
+          ...(candidate.sourceName ? { sourceName: candidate.sourceName } : {}),
+          ...(candidate.displayName ? { displayName: candidate.displayName } : {}),
+          relativePath: candidate.relativePath,
+          sourceRelativePath: candidate.sourceRelativePath,
+          ...(candidate.diff ? { diff: candidate.diff } : {}),
+        })
+      } catch (error: any) {
+        console.error(`Failed to upload ${candidate.name}:`, error.message)
+        // Continue with other files
+      }
     }
+  } finally {
+    selection.cleanup?.()
   }
 
   if (uploadedScreenshots.length === 0) {

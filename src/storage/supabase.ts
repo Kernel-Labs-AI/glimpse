@@ -65,4 +65,25 @@ export class SupabaseStorage implements StorageProvider {
     console.log(`✓ Uploaded: ${urlData.publicUrl}`)
     return urlData.publicUrl
   }
+
+  async download(remotePath: string): Promise<Buffer | undefined> {
+    await this.initialize()
+
+    const { data, error } = await this.client.storage
+      .from(this.bucket)
+      .download(remotePath)
+
+    if (error) {
+      if ((error as any).statusCode === '404' || error.message.includes('not found')) {
+        return undefined
+      }
+      throw new Error(`Failed to download ${remotePath}: ${error.message}`)
+    }
+
+    if (!data) {
+      return undefined
+    }
+
+    return Buffer.from(await data.arrayBuffer())
+  }
 }

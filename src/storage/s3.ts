@@ -1,6 +1,23 @@
-import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, HeadBucketCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import fs from 'fs'
+import { Readable } from 'stream'
 import { StorageProvider, S3Config } from './index.js'
+
+async function streamToBuffer(stream: any): Promise<Buffer> {
+  if (stream instanceof Readable) {
+    const chunks: Buffer[] = []
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    }
+    return Buffer.concat(chunks)
+  }
+
+  if (stream?.transformToByteArray) {
+    return Buffer.from(await stream.transformToByteArray())
+  }
+
+  throw new Error('Unsupported S3 response body type')
+}
 
 export class S3Storage implements StorageProvider {
   private client: S3Client
@@ -82,5 +99,27 @@ export class S3Storage implements StorageProvider {
 
     console.log(`✓ Uploaded: ${publicUrl}`)
     return publicUrl
+  }
+
+  async download(remotePath: string): Promise<Buffer | undefined> {
+    await this.initialize()
+
+    try {
+      const result = await this.client.send(new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: remotePath,
+      }))
+
+      if (!result.Body) {
+        return undefined
+      }
+
+      return streamToBuffer(result.Body)
+    } catch (error: any) {
+      if (error.name === 'NoSuchKey' || error.name === 'NotFound') {
+        return undefined
+      }
+      throw error
+    }
   }
 }

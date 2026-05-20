@@ -1,361 +1,378 @@
 # Glimpse
 
-Upload Playwright screenshots to Supabase or S3 and automatically post them to GitHub PR comments for easy visual review.
+Glimpse uploads Playwright screenshots to Supabase Storage, S3, or Vercel Blob and posts them to a GitHub pull request comment.
 
-## Features
+It can post either captured screenshots or generated visual diffs. Diff filtering is meant to keep PR comments small: screenshots below a configured change threshold are not uploaded or posted.
 
-- 📸 **Automated Screenshot Upload** - Upload Playwright test screenshots to Supabase or S3
-- 🧪 **Test Helpers** - Capture screenshots directly in your Playwright tests
-- 💬 **GitHub PR Comments** - Automatically post screenshots as PR comments
-- 🔄 **Update Existing Comments** - Updates the same comment instead of creating duplicates
-- ☁️ **Multiple Storage Options** - Support for Supabase Storage and AWS S3
-- 🛠️ **Flexible** - CLI tool for CI environments or programmatic API for custom workflows
-- 🎯 **Framework Focused** - Designed specifically for Playwright + GitHub Actions
-
-## Installation
+## Install
 
 ```bash
 npm install --save-dev @kernel-labs/glimpse
 ```
 
-## Quick Start
+Glimpse expects Node 22 or newer.
 
-### Capturing Screenshots in Tests
+## Capture Screenshots
 
-Use the provided helper functions to capture screenshots directly in your Playwright tests. This approach works with your existing test setup and custom fixtures.
-
-#### `captureScreenshot`
-
-The simplest way to capture screenshots. Use this when you want basic screenshot functionality without Playwright test report integration:
+Use the Playwright helpers in tests that should produce PR screenshots.
 
 ```typescript
-import { test, expect } from '@playwright/test'
-import { captureScreenshot } from '@kernel-labs/glimpse/playwright'
-
-test('my app', async ({ page }) => {
-  await page.goto('https://example.com')
-
-  // Capture screenshot using helper
-  await captureScreenshot(page, 'homepage')
-
-  // Continue testing
-  await page.click('button#login')
-  await captureScreenshot(page, 'login-dialog')
-
-  // With options
-  await captureScreenshot(page, {
-    name: 'dashboard',
-    fullPage: true,
-    screenshotOptions: {
-      animations: 'disabled'
-    }
-  })
-})
-```
-
-**Characteristics:**
-- Saved to: `test-results/pr-screenshots/` (configurable via `PR_SCREENSHOTS_DIR` env var)
-- Filename is exactly as provided (i.e. `homepage.png`)
-- Does NOT attach to Playwright test report
-
-#### `captureScreenshotWithInfo`
-
-Use this when you want better integration with Playwright's test runner and reporting:
-
-```typescript
-import { test, expect } from '@playwright/test'
+import { test } from '@playwright/test'
 import { captureScreenshotWithInfo } from '@kernel-labs/glimpse/playwright'
 
-test('my app', async ({ page }, testInfo) => {
-  await page.goto('https://example.com')
-
-  // Capture screenshot with test context
-  await captureScreenshotWithInfo(page, testInfo, 'homepage')
-
-  // Continue testing
-  await page.click('button#login')
-  await captureScreenshotWithInfo(page, testInfo, 'login-dialog')
-
-  // With options
-  await captureScreenshotWithInfo(page, testInfo, {
-    name: 'dashboard',
-    fullPage: true,
-    screenshotOptions: {
-      animations: 'disabled'
-    }
-  })
+test('dashboard', async ({ page }, testInfo) => {
+  await page.goto('/dashboard')
+  await captureScreenshotWithInfo(page, testInfo, 'dashboard')
 })
 ```
 
-**Characteristics:**
-- Saved to: `test-results/pr-screenshots/` (configurable via `PR_SCREENSHOTS_DIR` env var)
-- Filename: `my-app-homepage.png` (prefixed with test name to avoid conflicts)
-- Attaches screenshot to Playwright test report (visible in HTML reports)
-- Better for test organization and debugging
+By default screenshots are written to `test-results/pr-screenshots`. Set `PR_SCREENSHOTS_DIR` to change that location.
 
-**When to use which:**
-- Use `captureScreenshotWithInfo` if you want screenshots in Playwright's HTML reports or need test name prefixes
-- Use `captureScreenshot` if you prefer simpler filenames and don't need test report integration
+There are two helpers:
 
-Screenshots are automatically saved to `test-results/pr-screenshots/` (configurable via `PR_SCREENSHOTS_DIR` env var).
+- `captureScreenshot(page, options)` writes `name.png`.
+- `captureScreenshotWithInfo(page, testInfo, options)` prefixes the filename with the test title, attaches the image to the Playwright report, and uses the test file as the default group in the GitHub comment.
 
-### CLI Usage (For Uploading)
+Both helpers accept:
 
-#### With Supabase Storage
+```typescript
+{
+  name: string
+  outputDir?: string
+  fullPage?: boolean
+  screenshotOptions?: Parameters<Page['screenshot']>[0]
+  group?: string
+}
+```
+
+## Upload Screenshots
+
+Upload captured screenshots after your Playwright run.
+
+Supabase:
 
 ```bash
-# Upload screenshots
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_PRIVATE_KEY=your-service-role-key \
 npx glimpse upload \
-  --directory ./test-results \
+  --directory ./test-results/pr-screenshots \
   --storage supabase \
   --pr 123
-
-# Environment variables required:
-# SUPABASE_URL=https://your-project.supabase.co
-# SUPABASE_PRIVATE_KEY=your-service-key
 ```
 
-#### With S3 Storage
+S3:
 
 ```bash
-# Upload screenshots
+AWS_REGION=us-east-1 \
+S3_BUCKET=my-screenshots \
 npx glimpse upload \
-  --directory ./test-results \
+  --directory ./test-results/pr-screenshots \
   --storage s3 \
   --pr 123
-
-# Environment variables required:
-# AWS_REGION=us-east-1
-# S3_BUCKET=my-screenshots
-# AWS_ACCESS_KEY_ID=your-access-key (optional, uses default AWS credentials)
-# AWS_SECRET_ACCESS_KEY=your-secret-key (optional)
 ```
 
-## GitHub Actions Integration
+Vercel Blob:
 
-Run this after your tests are completed:
+```bash
+VERCEL_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_... \
+npx glimpse upload \
+  --directory ./test-results/pr-screenshots \
+  --storage vercel-blob \
+  --pr 123
+```
+
+The upload command writes `screenshot-urls.json` by default. That JSON is the input for the GitHub comment step.
+
+## Post a GitHub Comment
+
+Use `postToGitHub` from a GitHub Actions step after upload.
 
 ```yaml
-name: UI Screenshots
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
 
-on:
-  pull_request:
-    branches: [main]
+steps:
+  - uses: actions/checkout@v4
 
-jobs:
-  screenshots:
-    name: Generate UI Screenshots
-    runs-on: ubuntu-latest
+  - uses: actions/setup-node@v4
+    with:
+      node-version: '22.x'
 
-    permissions:
-      contents: read
-      pull-requests: write
+  - run: npm ci
+  - run: npx playwright install --with-deps chromium
+  - run: npm run build
 
-    steps:
-      - uses: actions/checkout@v4
+  - name: Run screenshot tests
+    run: npm run test:e2e
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
+  - name: Upload screenshots
+    if: always()
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PRIVATE_KEY: ${{ secrets.SUPABASE_PRIVATE_KEY }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      RUN_ID: ${{ github.run_id }}
+    run: |
+      npx glimpse upload \
+        --directory ./test-results/pr-screenshots \
+        --storage supabase
 
-      - name: Install dependencies
-        run: npm ci
+  - name: Post screenshot comment
+    if: always()
+    uses: actions/github-script@v7
+    with:
+      script: |
+        const fs = require('fs')
+        const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js')
 
-      - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'))
 
-      - name: Build app
-        run: npm run build
-
-      - name: Run tests with screenshots
-        run: npm run test:e2e
-        # Your tests should use the screenshot helpers to capture screenshots
-
-      # Upload to Supabase
-      - name: Upload screenshots to Supabase
-        if: always()
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_PRIVATE_KEY: ${{ secrets.SUPABASE_PRIVATE_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          npx glimpse upload \
-            --directory ./test-results \
-            --storage supabase
-
-      # Post to PR
-      - name: Post screenshots to PR
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js');
-
-            const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
-
-            await postToGitHub({
-              screenshots,
-              prNumber: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              runId: context.runId,
-              repositoryUrl: context.payload.repository.html_url,
-              token: process.env.GITHUB_TOKEN
-            }, github);
+        await postToGitHub({
+          screenshots,
+          prNumber: context.issue.number,
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          runId: context.runId,
+          repositoryUrl: context.payload.repository.html_url,
+          token: process.env.GITHUB_TOKEN
+        }, github)
 ```
 
-### Using S3 Instead of Supabase
-
-Just replace the upload step:
+For S3, replace the upload step environment and storage type:
 
 ```yaml
-      - name: Upload screenshots to S3
-        if: always()
-        env:
-          AWS_REGION: us-east-1
-          S3_BUCKET: my-screenshots
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          npx glimpse upload \
-            --directory ./test-results \
-            --storage s3
+env:
+  AWS_REGION: us-east-1
+  S3_BUCKET: my-screenshots
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  RUN_ID: ${{ github.run_id }}
+run: |
+  npx glimpse upload \
+    --directory ./test-results/pr-screenshots \
+    --storage s3
 ```
+
+## Diff Against a Local Baseline
+
+Pass a baseline directory to compare current screenshots against previous screenshots with the same relative path.
+
+```bash
+npx glimpse upload \
+  --directory ./test-results/pr-screenshots \
+  --storage s3 \
+  --diff-base-directory ./test-results/baseline-screenshots \
+  --diff-mode diffs \
+  --min-diff-percentage 1
+```
+
+Important details:
+
+- Keep `--diff-base-directory` outside `--directory`; Glimpse recursively uploads PNG files from `--directory`.
+- `--diff-mode diffs` uploads generated diff images.
+- `--diff-mode screenshots` uploads the current screenshot, but only when it differs from the baseline.
+- `--min-diff-percentage` controls posting. Pixel diffs below that odiff `diffPercentage` are skipped.
+- Layout changes and screenshots with no matching baseline are always included because they are usually high-signal.
+- `--odiff-threshold` controls odiff pixel sensitivity. It is not the same as `--min-diff-percentage`.
+
+If every screenshot is below the threshold, `upload` writes an empty JSON array. `postToGitHub` will skip creating a new comment in that case.
+
+## Diff Against the Target Branch
+
+Storage-backed diffs require baseline screenshots to already exist in storage. In CI, those screenshots usually are not in the repository, so you need a separate workflow that runs on the target branch and uploads screenshots for each commit.
+
+The PR workflow then downloads the screenshots for the pull request's base commit and compares the current PR screenshots against them. If this baseline upload workflow is not set up, Glimpse has nothing to diff against and will treat screenshots as new images instead of failing the CI job.
+
+A push workflow for the target branch should upload screenshots using a commit-addressed path:
+
+```bash
+VERCEL_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_... \
+npx glimpse upload \
+  --directory ./test-results/pr-screenshots \
+  --storage vercel-blob \
+  --path-template 'glimpse-screenshots/commit-{commit}/{relativePath}'
+```
+
+On `pull_request` workflows, Glimpse reads `GITHUB_EVENT_PATH` and uses:
+
+- `pull_request.head.sha` for `{commit}` in the current upload path
+- `pull_request.base.sha` for `{commit}` in the baseline path
+- `pull_request.head.ref` and `pull_request.base.ref` for `{branch}` when needed
+
+Use storage-backed baselines in the PR workflow:
+
+```bash
+VERCEL_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_... \
+npx glimpse upload \
+  --directory ./test-results/pr-screenshots \
+  --storage vercel-blob \
+  --path-template 'glimpse-screenshots/pr-{pr}/run-{runId}/{relativePath}' \
+  --diff-base-from-storage \
+  --diff-base-path-template 'glimpse-screenshots/commit-{commit}/{relativePath}' \
+  --diff-mode diffs \
+  --min-diff-percentage 1
+```
+
+This downloads each baseline image from the rendered baseline path, runs odiff locally in CI, and uploads only selected screenshots or generated diff images.
+
+If the target branch has no stored screenshot for a path, Glimpse treats the current screenshot as a new high-signal image and includes it. The same fallback applies when diff mode is enabled without a usable baseline source: Glimpse skips odiff and uploads the current screenshots, marked as missing baselines.
 
 ## Storage Configuration
 
-### Supabase
+Supabase environment variables:
 
-ENV needed:
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_PRIVATE_KEY`: Your Supabase service role key
-   - `SUPABASE_BUCKET`: Optional if you need a custom bucket name (default: `screenshots`)
+- `SUPABASE_URL`: required
+- `SUPABASE_PRIVATE_KEY` or `SUPABASE_KEY`: required
+- `SUPABASE_BUCKET`: optional, defaults to `screenshots`
 
-### AWS S3
+S3 environment variables:
 
-1. Create an S3 bucket
-2. Configure bucket permissions for public read (or use presigned URLs)
-3. Add secrets to your GitHub repository:
-   - `AWS_ACCESS_KEY_ID`: Your AWS access key
-   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+- `AWS_REGION` or `S3_REGION`: required
+- `S3_BUCKET` or `AWS_BUCKET`: required
+- `AWS_ACCESS_KEY_ID`: optional when the default AWS credential chain is available
+- `AWS_SECRET_ACCESS_KEY`: optional when the default AWS credential chain is available
+- `S3_ENDPOINT`: optional for S3-compatible providers
+- `S3_PUBLIC_READ`: set to `false` to avoid public-read ACLs
 
-Environment variables:
-- `AWS_REGION` or `S3_REGION`: AWS region (required)
-- `S3_BUCKET` or `AWS_BUCKET`: Bucket name (required)
-- `S3_ENDPOINT`: Custom endpoint for S3-compatible services (optional)
-- `S3_PUBLIC_READ`: Set to `false` to disable public read ACL (default: `true`)
+Vercel Blob environment variables:
 
-### S3-Compatible Services
+- `VERCEL_BLOB_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN`: required
 
-The library works with any S3-compatible service (MinIO, DigitalOcean Spaces, Backblaze B2, etc.):
+Glimpse uploads Vercel Blob screenshots with public access so GitHub can render them in PR comments.
+
+For S3-compatible services:
 
 ```bash
 S3_ENDPOINT=https://nyc3.digitaloceanspaces.com \
 S3_REGION=us-east-1 \
 S3_BUCKET=my-screenshots \
-npx glimpse upload --directory ./test-results --storage s3
+npx glimpse upload --directory ./test-results/pr-screenshots --storage s3
 ```
 
 ## CLI Reference
 
-### `upload` command
-
-Upload screenshots to storage.
+### `glimpse upload`
 
 ```bash
-npx glimpse upload [options]
+npx glimpse upload --directory <path> --storage <supabase|s3|vercel-blob> [options]
 ```
 
-**Options:**
-- `-d, --directory <path>` - Directory containing screenshots (required)
-- `-s, --storage <type>` - Storage type: `supabase` or `s3` (required)
-- `-p, --pr <number>` - PR number (optional, can use `PR_NUMBER` env var)
-- `-r, --run-id <id>` - CI run ID (optional, can use `RUN_ID` env var)
-- `-t, --path-template <template>` - Path template for uploaded files (default: `pr-{pr}/run-{runId}/{filename}`)
-- `-o, --output <path>` - Output file for screenshot URLs (default: `screenshot-urls.json`)
+Options:
 
-### `generate-comment` command
+- `-d, --directory <path>`: directory containing PNG screenshots
+- `-s, --storage <type>`: `supabase`, `s3`, or `vercel-blob`
+- `-p, --pr <number>`: PR number; can also use `PR_NUMBER`
+- `-r, --run-id <id>`: CI run ID; can also use `RUN_ID`
+- `--commit <sha>`: commit SHA for path templates; defaults to the pull request head SHA or `GITHUB_SHA`
+- `--branch <name>`: branch name for path templates; defaults to the pull request head ref or GitHub branch env vars
+- `-t, --path-template <template>`: upload path template; default is `pr-{pr}/run-{runId}/{filename}`
+- `-o, --output <path>`: output JSON path; default is `screenshot-urls.json`
+- `--diff-base-directory <path>`: baseline screenshot directory
+- `--diff-base-from-storage`: download baseline screenshots from storage
+- `--diff-base-path-template <template>`: storage path template for baseline screenshots
+- `--diff-base-pr <number>`: PR number for baseline path templates
+- `--diff-base-run-id <id>`: run ID for baseline path templates
+- `--diff-base-commit <sha>`: commit SHA for baseline path templates; defaults to the pull request base SHA
+- `--diff-base-branch <name>`: branch name for baseline path templates; defaults to the pull request base ref
+- `--diff-mode <screenshots|diffs>`: upload changed screenshots or generated diffs
+- `--post-diffs`: shortcut for `--diff-mode diffs`
+- `--min-diff-percentage <number>`: skip pixel diffs below this odiff `diffPercentage`
+- `--odiff-threshold <number>`: odiff color threshold from `0` to `1`; lower is more sensitive
+- `--diff-output-directory <path>`: write generated diff images to a specific directory
 
-Generate PR comment markdown from uploaded screenshots.
+Path templates support:
+
+- `{pr}`
+- `{runId}`
+- `{commit}`
+- `{branch}`
+- `{filename}`
+- `{relativePath}`
+
+Diff options can also be set with:
+
+- `DIFF_BASE_DIRECTORY`
+- `DIFF_BASE_FROM_STORAGE=true`
+- `DIFF_BASE_PATH_TEMPLATE`
+- `DIFF_BASE_PR`
+- `DIFF_BASE_RUN_ID`
+- `GLIMPSE_DIFF_BASE_COMMIT`
+- `GLIMPSE_DIFF_BASE_BRANCH`
+- `DIFF_MODE`
+- `POST_DIFFS=true`
+- `MIN_DIFF_PERCENTAGE`
+- `ODIFF_THRESHOLD`
+- `DIFF_OUTPUT_DIRECTORY`
+
+### `glimpse generate-comment`
 
 ```bash
-npx glimpse generate-comment [options]
+npx glimpse generate-comment --input screenshot-urls.json [options]
 ```
 
-**Options:**
-- `-i, --input <path>` - Input file with screenshot URLs (required)
-- `-p, --pr <number>` - PR number
-- `-r, --run-id <id>` - CI run ID
-- `--repo-url <url>` - Repository URL
-- `-o, --output <path>` - Output file for comment markdown
+Options:
 
-## API Reference
+- `-i, --input <path>`: JSON file generated by `glimpse upload`
+- `-p, --pr <number>`: PR number
+- `-r, --run-id <id>`: CI run ID
+- `--repo-url <url>`: repository URL
+- `-o, --output <path>`: output markdown path; default is `pr-comment.md`
 
-Other functions you can use if you want to customize your workflow:
-
-### `uploadScreenshots(options)`
-
-Upload screenshots to the configured storage provider.
+## Programmatic API
 
 ```typescript
-interface UploadOptions {
-  directory: string
-  storage: StorageConfig
-  pathTemplate?: string
-  prNumber?: string | number
-  runId?: string | number
-}
+import { uploadScreenshots, postToGitHub } from '@kernel-labs/glimpse'
 
-const screenshots = await uploadScreenshots(options)
+const screenshots = await uploadScreenshots({
+  directory: 'test-results/pr-screenshots',
+  storage: {
+    type: 'vercel-blob',
+    token: process.env.VERCEL_BLOB_READ_WRITE_TOKEN
+  },
+  pathTemplate: 'glimpse-screenshots/pr-{pr}/run-{runId}/{relativePath}',
+  prNumber: 123,
+  runId: process.env.GITHUB_RUN_ID,
+  diff: {
+    baselineStorage: {
+      pathTemplate: 'glimpse-screenshots/commit-{commit}/{relativePath}',
+      commitSha: process.env.GITHUB_BASE_SHA
+    },
+    uploadMode: 'diffs',
+    minDiffPercentage: 1
+  }
+})
+
+await postToGitHub({
+  screenshots,
+  prNumber: 123,
+  owner: 'owner',
+  repo: 'repo',
+  token: process.env.GITHUB_TOKEN!,
+  runId: process.env.GITHUB_RUN_ID,
+  repositoryUrl: 'https://github.com/owner/repo'
+}, github)
 ```
 
-### `postToGitHub(options, githubClient)`
+Useful exported types:
 
-Post or update a GitHub PR comment with screenshots.
-
-```typescript
-interface GitHubCommentOptions {
-  screenshots: UploadedScreenshot[]
-  prNumber: number
-  token: string
-  owner: string
-  repo: string
-  runId?: string | number
-  repositoryUrl?: string
-}
-
-await postToGitHub(options, github)
-```
-
-### `generateCommentBody(options)`
-
-Generate markdown for a GitHub PR comment.
-
-```typescript
-const markdown = generateCommentBody(options)
-```
+- `UploadOptions`
+- `UploadedScreenshot`
+- `ScreenshotDiffOptions`
+- `ScreenshotBaselineStorageOptions`
+- `GitHubCommentOptions`
+- `StorageConfig`
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Build
 npm run build
-
-# Watch mode
-npm run dev
+npm run test
 ```
 
 ## License
 
 MIT
-
-## Contributing
-
-Please open an issue before proposing a PR if you'd like to contribute. 
