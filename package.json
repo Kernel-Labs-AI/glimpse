@@ -23,8 +23,10 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "test": "playwright test"
   },
