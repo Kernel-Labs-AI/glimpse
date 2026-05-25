@@ -3,6 +3,7 @@
 import { Command } from 'commander'
 import fs from 'fs'
 import { uploadScreenshots } from './upload.js'
+import { uploadReplays } from './upload-replays.js'
 import { generateCommentBody } from './github/comment.js'
 import type { StorageConfig } from './storage/index.js'
 import type { ODiffOptions } from 'odiff-bin'
@@ -33,16 +34,52 @@ function readGitHubEvent(): any | undefined {
   }
 }
 
+function buildStorageConfig(storageType: string): StorageConfig {
+  if (storageType === 's3') {
+    const region = process.env.AWS_REGION || process.env.S3_REGION
+    const bucket = process.env.S3_BUCKET || process.env.AWS_BUCKET
+
+    if (!region || !bucket) {
+      throw new Error('AWS_REGION (or S3_REGION) and S3_BUCKET (or AWS_BUCKET) environment variables are required')
+    }
+
+    return {
+      type: 's3',
+      region,
+      bucket,
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      endpoint: process.env.S3_ENDPOINT,
+      publicRead: process.env.S3_PUBLIC_READ !== 'false',
+    }
+  }
+
+  if (storageType === 'vercel-blob') {
+    const token = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN
+
+    if (!token) {
+      throw new Error('VERCEL_BLOB_READ_WRITE_TOKEN (or BLOB_READ_WRITE_TOKEN) environment variable is required')
+    }
+
+    return {
+      type: 'vercel-blob',
+      token,
+    }
+  }
+
+  throw new Error(`Unknown storage type: ${storageType}. Supported types: s3, vercel-blob`)
+}
+
 program
   .name('glimpse')
-  .description('Upload Playwright screenshots to storage and generate PR comments')
+  .description('Upload Playwright screenshots and replay videos to S3 or Vercel Blob and generate PR comments')
   .version('0.1.0')
 
 program
   .command('upload')
   .description('Upload screenshots to storage')
   .requiredOption('-d, --directory <path>', 'Directory containing screenshots')
-  .requiredOption('-s, --storage <type>', 'Storage type: supabase, s3, or vercel-blob')
+  .requiredOption('-s, --storage <type>', 'Storage type: s3 or vercel-blob')
   .option('-p, --pr <number>', 'PR number')
   .option('-r, --run-id <id>', 'CI run ID')
   .option('--commit <sha>', 'Commit SHA for upload path templates')
@@ -66,59 +103,7 @@ program
       const { directory, storage: storageType, pr, runId, pathTemplate, output } = options
       const githubEvent = readGitHubEvent()
 
-      // Build storage config from environment variables
-      let storageConfig: StorageConfig
-
-      if (storageType === 'supabase') {
-        const url = process.env.SUPABASE_URL
-        const key = process.env.SUPABASE_PRIVATE_KEY || process.env.SUPABASE_KEY
-
-        if (!url || !key) {
-          console.error('Error: SUPABASE_URL and SUPABASE_PRIVATE_KEY environment variables are required')
-          process.exit(1)
-        }
-
-        storageConfig = {
-          type: 'supabase',
-          url,
-          key,
-          bucket: process.env.SUPABASE_BUCKET
-        }
-      } else if (storageType === 's3') {
-        const region = process.env.AWS_REGION || process.env.S3_REGION
-        const bucket = process.env.S3_BUCKET || process.env.AWS_BUCKET
-
-        if (!region || !bucket) {
-          console.error('Error: AWS_REGION (or S3_REGION) and S3_BUCKET (or AWS_BUCKET) environment variables are required')
-          process.exit(1)
-        }
-
-        storageConfig = {
-          type: 's3',
-          region,
-          bucket,
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-          endpoint: process.env.S3_ENDPOINT,
-          publicRead: process.env.S3_PUBLIC_READ !== 'false'
-        }
-      } else if (storageType === 'vercel-blob') {
-        const token = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN
-
-        if (!token) {
-          console.error('Error: VERCEL_BLOB_READ_WRITE_TOKEN (or BLOB_READ_WRITE_TOKEN) environment variable is required')
-          process.exit(1)
-        }
-
-        storageConfig = {
-          type: 'vercel-blob',
-          token,
-        }
-      } else {
-        console.error(`Error: Unknown storage type: ${storageType}`)
-        console.error('Supported types: supabase, s3, vercel-blob')
-        process.exit(1)
-      }
+      const storageConfig = buildStorageConfig(storageType)
 
       const prNumber = pr || process.env.PR_NUMBER
       const resolvedRunId = runId || process.env.RUN_ID || process.env.GITHUB_RUN_ID
@@ -240,31 +225,100 @@ program
   })
 
 program
+  .command('upload-replays')
+  .description('Upload Playwright replay videos to storage')
+  .requiredOption('-d, --directory <path>', 'Directory containing Playwright replay videos')
+  .requiredOption('-s, --storage <type>', 'Storage type: s3 or vercel-blob')
+  .option('-p, --pr <number>', 'PR number')
+  .option('-r, --run-id <id>', 'CI run ID')
+  .option('--commit <sha>', 'Commit SHA for upload path templates')
+  .option('--branch <name>', 'Branch name for upload path templates')
+  .option('-t, --path-template <template>', 'Path template for uploaded replay videos')
+  .option('-o, --output <path>', 'Output file for replay video URLs (JSON)')
+  .option('--allow-empty', 'Write an empty replay URL file instead of failing when no videos are found')
+  .action(async (options) => {
+    try {
+      const { directory, storage: storageType, pr, runId, pathTemplate, output } = options
+      const githubEvent = readGitHubEvent()
+      const storageConfig = buildStorageConfig(storageType)
+
+      const prNumber = pr || process.env.PR_NUMBER
+      const resolvedRunId = runId || process.env.RUN_ID || process.env.GITHUB_RUN_ID
+      const commitSha = options.commit ||
+        process.env.GLIMPSE_COMMIT_SHA ||
+        githubEvent?.pull_request?.head?.sha ||
+        process.env.GITHUB_SHA
+      const branch = options.branch ||
+        process.env.GLIMPSE_BRANCH ||
+        githubEvent?.pull_request?.head?.ref ||
+        process.env.GITHUB_HEAD_REF ||
+        process.env.GITHUB_REF_NAME
+
+      const replays = await uploadReplays({
+        directory,
+        storage: storageConfig,
+        prNumber,
+        runId: resolvedRunId,
+        commitSha,
+        branch,
+        pathTemplate,
+        allowEmpty: options.allowEmpty,
+      })
+
+      const outputPath = output || process.env.REPLAYS_OUTPUT_FILE || 'replay-urls.json'
+      fs.writeFileSync(
+        outputPath,
+        JSON.stringify(replays, null, 2)
+      )
+      console.log(`\n✓ Saved replay URLs to ${outputPath}`)
+
+      if (process.env.GITHUB_OUTPUT) {
+        const outputLine = `replays=${JSON.stringify(replays)}\n`
+        fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLine)
+      }
+    } catch (error: any) {
+      console.error('Error:', error.message)
+      process.exit(1)
+    }
+  })
+
+program
   .command('generate-comment')
-  .description('Generate GitHub PR comment markdown from screenshot URLs')
-  .requiredOption('-i, --input <path>', 'Input file with screenshot URLs (JSON)')
+  .description('Generate GitHub PR comment markdown from uploaded screenshots and replay videos')
+  .option('-i, --input <path>', 'Input file with screenshot URLs (JSON)')
+  .option('--replays-input <path>', 'Input file with replay video URLs (JSON)')
   .option('-p, --pr <number>', 'PR number')
   .option('-r, --run-id <id>', 'CI run ID')
   .option('--repo-url <url>', 'Repository URL')
   .option('-o, --output <path>', 'Output file for comment markdown')
   .action(async (options) => {
     try {
-      const { input, pr, runId, repoUrl, output } = options
+      const { input, replaysInput, pr, runId, repoUrl, output } = options
 
-      // Read screenshots from input file
-      const screenshots = JSON.parse(fs.readFileSync(input, 'utf8'))
+      if (!input && !replaysInput) {
+        throw new Error('Provide --input, --replays-input, or both')
+      }
+
+      const screenshots = input
+        ? JSON.parse(fs.readFileSync(input, 'utf8'))
+        : []
+      const replays = replaysInput
+        ? JSON.parse(fs.readFileSync(replaysInput, 'utf8'))
+        : []
 
       // Get values from options or environment
       const prNumber = Number(pr || process.env.PR_NUMBER)
       const owner = process.env.GITHUB_REPOSITORY_OWNER || 'owner'
       const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'repo'
-      const repositoryUrl = repoUrl || process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY
+      const repositoryUrl = repoUrl ||
+        (process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY
         ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}`
-        : undefined
+        : undefined)
 
       // Generate comment body
       const commentBody = generateCommentBody({
         screenshots,
+        replays,
         prNumber,
         owner,
         repo,

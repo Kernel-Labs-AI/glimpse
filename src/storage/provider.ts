@@ -1,5 +1,4 @@
 import { StorageProvider, StorageConfig } from './index.js'
-import { SupabaseStorage } from './supabase.js'
 import { S3Storage } from './s3.js'
 import { VercelBlobStorage } from './vercel-blob.js'
 
@@ -8,8 +7,6 @@ import { VercelBlobStorage } from './vercel-blob.js'
  */
 export function createStorageProvider(config: StorageConfig): StorageProvider {
   switch (config.type) {
-    case 'supabase':
-      return new SupabaseStorage(config)
     case 's3':
       return new S3Storage(config)
     case 'vercel-blob':

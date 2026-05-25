@@ -1,6 +1,6 @@
 # Glimpse
 
-Glimpse uploads Playwright screenshots to Supabase Storage, S3, or Vercel Blob and posts them to a GitHub pull request comment.
+Glimpse uploads Playwright screenshots and replay videos to S3-compatible storage or Vercel Blob and posts them to a GitHub pull request comment.
 
 It can post either captured screenshots or generated visual diffs. Diff filtering is meant to keep PR comments small: screenshots below a configured change threshold are not uploaded or posted.
 
@@ -49,18 +49,7 @@ Both helpers accept:
 
 Upload captured screenshots after your Playwright run.
 
-Supabase:
-
-```bash
-SUPABASE_URL=https://your-project.supabase.co \
-SUPABASE_PRIVATE_KEY=your-service-role-key \
-npx glimpse upload \
-  --directory ./test-results/pr-screenshots \
-  --storage supabase \
-  --pr 123
-```
-
-S3:
+S3-compatible storage:
 
 ```bash
 AWS_REGION=us-east-1 \
@@ -82,6 +71,38 @@ npx glimpse upload \
 ```
 
 The upload command writes `screenshot-urls.json` by default. That JSON is the input for the GitHub comment step.
+
+## Upload Playwright Replays
+
+Enable Playwright video recording, then upload the generated replay videos after the test run. These replays are useful for monitoring what an automated coding agent did during a browser session, not only for reviewing test failures.
+
+Glimpse works with whichever Playwright `video` mode you choose; see Playwright's [video recording documentation](https://playwright.dev/docs/videos) and [`testOptions.video`](https://playwright.dev/docs/api/class-testoptions#test-options-video) for the available options. For agent monitoring, recording the run and reducing the recording dimensions is usually more useful than failure-based retention:
+
+```typescript
+import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  use: {
+    video: {
+      mode: 'on',
+      size: { width: 640, height: 360 },
+    },
+  },
+})
+```
+
+Glimpse does not transcode videos in CI. Playwright already emits compressed video files, and lowering the Playwright recording size is usually faster and less bandwidth-heavy than adding a post-test compression step.
+
+```bash
+VERCEL_BLOB_READ_WRITE_TOKEN=vercel_blob_rw_... \
+npx glimpse upload-replays \
+  --directory ./test-results \
+  --storage vercel-blob \
+  --pr 123 \
+  --allow-empty
+```
+
+The command recursively uploads `.webm`, `.mp4`, `.mov`, and `.m4v` files and writes `replay-urls.json` by default. Use `--allow-empty` when your Playwright configuration may produce no videos for a run.
 
 ## Post a GitHub Comment
 
@@ -110,14 +131,25 @@ steps:
   - name: Upload screenshots
     if: always()
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_PRIVATE_KEY: ${{ secrets.SUPABASE_PRIVATE_KEY }}
+      VERCEL_BLOB_READ_WRITE_TOKEN: ${{ secrets.VERCEL_BLOB_READ_WRITE_TOKEN }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
       RUN_ID: ${{ github.run_id }}
     run: |
       npx glimpse upload \
         --directory ./test-results/pr-screenshots \
-        --storage supabase
+        --storage vercel-blob
+
+  - name: Upload replay videos
+    if: always()
+    env:
+      VERCEL_BLOB_READ_WRITE_TOKEN: ${{ secrets.VERCEL_BLOB_READ_WRITE_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      RUN_ID: ${{ github.run_id }}
+    run: |
+      npx glimpse upload-replays \
+        --directory ./test-results \
+        --storage vercel-blob \
+        --allow-empty
 
   - name: Post screenshot comment
     if: always()
@@ -128,9 +160,13 @@ steps:
         const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js')
 
         const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'))
+        const replays = fs.existsSync('replay-urls.json')
+          ? JSON.parse(fs.readFileSync('replay-urls.json', 'utf8'))
+          : []
 
         await postToGitHub({
           screenshots,
+          replays,
           prNumber: context.issue.number,
           owner: context.repo.owner,
           repo: context.repo.repo,
@@ -140,7 +176,7 @@ steps:
         }, github)
 ```
 
-For S3, replace the upload step environment and storage type:
+For S3-compatible storage, replace the upload step environment and storage type:
 
 ```yaml
 env:
@@ -222,12 +258,6 @@ If the target branch has no stored screenshot for a path, Glimpse treats the cur
 
 ## Storage Configuration
 
-Supabase environment variables:
-
-- `SUPABASE_URL`: required
-- `SUPABASE_PRIVATE_KEY` or `SUPABASE_KEY`: required
-- `SUPABASE_BUCKET`: optional, defaults to `screenshots`
-
 S3 environment variables:
 
 - `AWS_REGION` or `S3_REGION`: required
@@ -241,7 +271,7 @@ Vercel Blob environment variables:
 
 - `VERCEL_BLOB_READ_WRITE_TOKEN` or `BLOB_READ_WRITE_TOKEN`: required
 
-Glimpse uploads Vercel Blob screenshots with public access so GitHub can render them in PR comments.
+Glimpse uploads Vercel Blob artifacts with public access so GitHub can render them in PR comments.
 
 For S3-compatible services:
 
@@ -252,18 +282,20 @@ S3_BUCKET=my-screenshots \
 npx glimpse upload --directory ./test-results/pr-screenshots --storage s3
 ```
 
+Supabase Storage users can use the S3 adapter with Supabase's S3-compatible endpoint and credentials via `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
+
 ## CLI Reference
 
 ### `glimpse upload`
 
 ```bash
-npx glimpse upload --directory <path> --storage <supabase|s3|vercel-blob> [options]
+npx glimpse upload --directory <path> --storage <s3|vercel-blob> [options]
 ```
 
 Options:
 
 - `-d, --directory <path>`: directory containing PNG screenshots
-- `-s, --storage <type>`: `supabase`, `s3`, or `vercel-blob`
+- `-s, --storage <type>`: `s3` or `vercel-blob`
 - `-p, --pr <number>`: PR number; can also use `PR_NUMBER`
 - `-r, --run-id <id>`: CI run ID; can also use `RUN_ID`
 - `--commit <sha>`: commit SHA for path templates; defaults to the pull request head SHA or `GITHUB_SHA`
@@ -307,15 +339,34 @@ Diff options can also be set with:
 - `ODIFF_THRESHOLD`
 - `DIFF_OUTPUT_DIRECTORY`
 
+### `glimpse upload-replays`
+
+```bash
+npx glimpse upload-replays --directory <path> --storage <s3|vercel-blob> [options]
+```
+
+Options:
+
+- `-d, --directory <path>`: directory containing Playwright replay videos
+- `-s, --storage <type>`: `s3` or `vercel-blob`
+- `-p, --pr <number>`: PR number; can also use `PR_NUMBER`
+- `-r, --run-id <id>`: CI run ID; can also use `RUN_ID`
+- `--commit <sha>`: commit SHA for path templates; defaults to the pull request head SHA or `GITHUB_SHA`
+- `--branch <name>`: branch name for path templates; defaults to the pull request head ref or GitHub branch env vars
+- `-t, --path-template <template>`: upload path template; default is `pr-{pr}/run-{runId}/replays/{relativePath}`
+- `-o, --output <path>`: output JSON path; default is `replay-urls.json`
+- `--allow-empty`: write an empty replay URL file instead of failing when no videos are found
+
 ### `glimpse generate-comment`
 
 ```bash
-npx glimpse generate-comment --input screenshot-urls.json [options]
+npx glimpse generate-comment --input screenshot-urls.json --replays-input replay-urls.json [options]
 ```
 
 Options:
 
 - `-i, --input <path>`: JSON file generated by `glimpse upload`
+- `--replays-input <path>`: JSON file generated by `glimpse upload-replays`
 - `-p, --pr <number>`: PR number
 - `-r, --run-id <id>`: CI run ID
 - `--repo-url <url>`: repository URL
@@ -324,7 +375,7 @@ Options:
 ## Programmatic API
 
 ```typescript
-import { uploadScreenshots, postToGitHub } from '@kernel-labs/glimpse'
+import { uploadReplays, uploadScreenshots, postToGitHub } from '@kernel-labs/glimpse'
 
 const screenshots = await uploadScreenshots({
   directory: 'test-results/pr-screenshots',
@@ -345,8 +396,20 @@ const screenshots = await uploadScreenshots({
   }
 })
 
+const replays = await uploadReplays({
+  directory: 'test-results',
+  storage: {
+    type: 'vercel-blob',
+    token: process.env.VERCEL_BLOB_READ_WRITE_TOKEN
+  },
+  prNumber: 123,
+  runId: process.env.GITHUB_RUN_ID,
+  allowEmpty: true
+})
+
 await postToGitHub({
   screenshots,
+  replays,
   prNumber: 123,
   owner: 'owner',
   repo: 'repo',
@@ -359,7 +422,9 @@ await postToGitHub({
 Useful exported types:
 
 - `UploadOptions`
+- `ReplayUploadOptions`
 - `UploadedScreenshot`
+- `UploadedReplay`
 - `ScreenshotDiffOptions`
 - `ScreenshotBaselineStorageOptions`
 - `GitHubCommentOptions`

@@ -1,7 +1,7 @@
 {
   "name": "@kernel-labs/glimpse",
   "version": "1.0.0",
-  "description": "Upload Playwright screenshots to Supabase, S3, or Vercel Blob and post GitHub PR comments",
+  "description": "Upload Playwright screenshots and replay videos to S3 or Vercel Blob and post GitHub PR comments",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -35,7 +35,6 @@
     "pr",
     "pull-request",
     "visual-testing",
-    "supabase",
     "s3",
     "vercel",
     "vercel-blob"
@@ -51,7 +50,6 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.700.0",
-    "@supabase/supabase-js": "^2.79.0",
     "@vercel/blob": "^2.4.0",
     "commander": "^12.1.0",
     "odiff-bin": "^4.3.8"

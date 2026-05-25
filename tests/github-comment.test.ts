@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { generateCommentBody, postToGitHub } from '../src/github/comment.js'
-import type { UploadedScreenshot } from '../src/storage/index.js'
+import type { UploadedReplay, UploadedScreenshot } from '../src/storage/index.js'
 
 const baseOptions = {
   prNumber: 123,
@@ -291,6 +291,47 @@ test.describe('generateCommentBody', () => {
       expect(comment).toContain('<summary><strong>auth.spec.ts</strong> (2 changes)</summary>')
     })
   })
+
+  test.describe('replay videos', () => {
+    test('should render uploaded Playwright replays as videos', () => {
+      const screenshots: UploadedScreenshot[] = [
+        { name: 'homepage.png', url: 'https://example.com/homepage.png', path: 'homepage.png' },
+      ]
+      const replays: UploadedReplay[] = [
+        {
+          name: 'video.webm',
+          displayName: 'homepage flow',
+          url: 'https://example.com/homepage.webm',
+          path: 'pr-123/replays/homepage/video.webm',
+          relativePath: 'homepage/video.webm',
+          contentType: 'video/webm',
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots, replays })
+
+      expect(comment).toContain('## 🎥 Playwright Replays')
+      expect(comment).toContain('<video src="https://example.com/homepage.webm" width="360" controls></video>')
+      expect(comment).toContain('<a href="https://example.com/homepage.webm">homepage flow</a>')
+    })
+
+    test('should allow replay-only comments', () => {
+      const replays: UploadedReplay[] = [
+        {
+          name: 'video.webm',
+          displayName: 'checkout',
+          url: 'https://example.com/checkout.webm',
+          path: 'pr-123/replays/checkout/video.webm',
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots: [], replays })
+
+      expect(comment).toContain('No screenshots or diffs were selected for this run')
+      expect(comment).toContain('## 🎥 Playwright Replays')
+      expect(comment).toContain('checkout')
+    })
+  })
 })
 
 test.describe('postToGitHub', () => {
@@ -338,5 +379,37 @@ test.describe('postToGitHub', () => {
     await postToGitHub({ ...baseOptions, screenshots: [] }, githubClient)
 
     expect(updatedBody).toContain('No screenshots or diffs were selected for this run')
+  })
+
+  test('should create a comment when only replay videos are present', async () => {
+    let createdBody = ''
+    const githubClient = {
+      rest: {
+        issues: {
+          listComments: async () => ({ data: [] }),
+          updateComment: async () => {
+            throw new Error('should not update')
+          },
+          createComment: async ({ body }: { body: string }) => {
+            createdBody = body
+          },
+        },
+      },
+    }
+
+    await postToGitHub({
+      ...baseOptions,
+      screenshots: [],
+      replays: [
+        {
+          name: 'video.webm',
+          url: 'https://example.com/video.webm',
+          path: 'pr-123/replays/video.webm',
+        },
+      ],
+    }, githubClient)
+
+    expect(createdBody).toContain('## 🎥 Playwright Replays')
+    expect(createdBody).toContain('https://example.com/video.webm')
   })
 })

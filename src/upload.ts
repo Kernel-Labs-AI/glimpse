@@ -84,7 +84,7 @@ export async function uploadScreenshots(
       const manifestEntry = getManifest(candidate.sourcePath)[sourceFilename]
 
       try {
-        const url = await provider.upload(candidate.uploadPath, remotePath)
+        const url = await provider.upload(candidate.uploadPath, remotePath, { contentType: 'image/png' })
         uploadedScreenshots.push({
           name: candidate.name,
           url,

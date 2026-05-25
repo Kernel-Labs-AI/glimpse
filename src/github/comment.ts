@@ -1,8 +1,10 @@
-import { UploadedScreenshot } from '../storage/index.js'
+import { UploadedReplay, UploadedScreenshot } from '../storage/index.js'
 
 export interface GitHubCommentOptions {
   /** Uploaded screenshots to display */
   screenshots: UploadedScreenshot[]
+  /** Uploaded Playwright replay videos to display */
+  replays?: UploadedReplay[]
   /** PR number */
   prNumber: number
   /** GitHub token for authentication */
@@ -24,6 +26,7 @@ function formatDisplayName(name: string): string {
   return name
     .replace('.diff.png', '')
     .replace('.png', '')
+    .replace(/\.(webm|mp4|mov|m4v)$/i, '')
     .replace(/-/g, ' ')
     .replace(/_/g, ' ')
 }
@@ -83,17 +86,43 @@ function generateThumbnailGrid(screenshots: UploadedScreenshot[]): string {
 }
 
 /**
+ * Generate a video grid table for uploaded Playwright replays.
+ */
+function generateReplayGrid(replays: UploadedReplay[]): string {
+  if (replays.length === 0) return ''
+
+  let grid = '| | |\n'
+  grid += '|---|---|\n'
+
+  for (let i = 0; i < replays.length; i += 2) {
+    const row = replays.slice(i, i + 2)
+    const cells = row.map(replay => {
+      const displayName = formatDisplayName(replay.displayName || replay.relativePath || replay.name)
+      return `<video src="${replay.url}" width="360" controls></video><br><a href="${replay.url}">${displayName}</a>`
+    })
+    while (cells.length < 2) {
+      cells.push('')
+    }
+    grid += `| ${cells.join(' | ')} |\n`
+  }
+
+  return grid
+}
+
+/**
  * Generate markdown comment body for GitHub PR
  * Groups screenshots by category and renders them as a thumbnail grid
  */
 export function generateCommentBody(options: GitHubCommentOptions): string {
-  const { screenshots, runId, repositoryUrl } = options
+  const { screenshots, replays = [], runId, repositoryUrl } = options
 
   let commentBody = '## 📸 UI Screenshots\n\n'
   const hasDiffMetadata = screenshots.some(s => s.diff)
 
-  if (screenshots.length === 0) {
+  if (screenshots.length === 0 && replays.length === 0) {
     commentBody += 'No screenshots or diffs were selected for this run.\n'
+  } else if (screenshots.length === 0) {
+    commentBody += 'No screenshots or diffs were selected for this run.\n\n'
   } else if (hasDiffMetadata) {
     commentBody += 'Showing the highest-signal visual changes from the latest build:\n\n'
   } else {
@@ -128,6 +157,13 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
     commentBody += generateThumbnailGrid(screenshots)
   }
 
+  if (replays.length > 0) {
+    commentBody += screenshots.length > 0 ? '\n' : ''
+    commentBody += '## 🎥 Playwright Replays\n\n'
+    commentBody += 'Recorded browser sessions from the latest build:\n\n'
+    commentBody += generateReplayGrid(replays)
+  }
+
   commentBody += '\n---\n'
 
   if (runId && repositoryUrl) {
@@ -140,7 +176,7 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
 }
 
 /**
- * Post or update a GitHub PR comment with screenshots
+ * Post or update a GitHub PR comment with screenshots and replay videos
  * Note: This function is designed to be called from a GitHub Actions workflow
  * using actions/github-script@v7, as it requires the GitHub API client.
  *
@@ -150,7 +186,7 @@ export async function postToGitHub(
   options: GitHubCommentOptions,
   githubClient: any
 ): Promise<void> {
-  const { screenshots, prNumber, owner, repo } = options
+  const { screenshots, replays = [], prNumber, owner, repo } = options
 
   // Find existing comment
   const { data: comments } = await githubClient.rest.issues.listComments({
@@ -164,7 +200,7 @@ export async function postToGitHub(
     comment.body.includes('📸 UI Screenshots')
   )
 
-  if (screenshots.length === 0 && !botComment) {
+  if (screenshots.length === 0 && replays.length === 0 && !botComment) {
     console.log('✓ No screenshots selected; skipping PR comment')
     return
   }

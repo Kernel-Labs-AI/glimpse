@@ -68,7 +68,7 @@ export class S3Storage implements StorageProvider {
     this.initialized = true
   }
 
-  async upload(filePath: string, remotePath: string): Promise<string> {
+  async upload(filePath: string, remotePath: string, options: { contentType?: string } = {}): Promise<string> {
     await this.initialize()
 
     const fileBuffer = fs.readFileSync(filePath)
@@ -80,7 +80,7 @@ export class S3Storage implements StorageProvider {
       Bucket: this.bucket,
       Key: remotePath,
       Body: fileBuffer,
-      ContentType: 'image/png',
+      ContentType: options.contentType || 'image/png',
       ACL: this.publicRead ? 'public-read' : undefined,
     })
 

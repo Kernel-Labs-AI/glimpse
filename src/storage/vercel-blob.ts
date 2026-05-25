@@ -27,7 +27,7 @@ export class VercelBlobStorage implements StorageProvider {
     this.token = config.token || process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN
   }
 
-  async upload(filePath: string, remotePath: string): Promise<string> {
+  async upload(filePath: string, remotePath: string, options: { contentType?: string } = {}): Promise<string> {
     if (!this.token) {
       throw new Error('VERCEL_BLOB_READ_WRITE_TOKEN or BLOB_READ_WRITE_TOKEN is required for Vercel Blob uploads')
     }
@@ -39,7 +39,7 @@ export class VercelBlobStorage implements StorageProvider {
 
     const blob = await put(remotePath, fileBuffer, {
       access: 'public',
-      contentType: 'image/png',
+      contentType: options.contentType || 'image/png',
       token: this.token,
       addRandomSuffix: false,
       allowOverwrite: true,
