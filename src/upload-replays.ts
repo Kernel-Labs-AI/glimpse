@@ -1,4 +1,5 @@
 import path from 'path'
+import fs from 'fs'
 import { ReplayUploadOptions, UploadedReplay } from './storage/index.js'
 import { createStorageProvider } from './storage/provider.js'
 import { findReplayVideos } from './utils/find-replay-videos.js'
@@ -36,6 +37,14 @@ export async function uploadReplays(
     branch,
     allowEmpty = false,
   } = options
+
+  if (!fs.existsSync(directory)) {
+    if (allowEmpty) {
+      console.log(`No replay videos found in ${directory}`)
+      return []
+    }
+    throw new Error(`Directory ${directory} does not exist`)
+  }
 
   const videos = findReplayVideos(directory)
 

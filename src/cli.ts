@@ -5,6 +5,7 @@ import fs from 'fs'
 import { uploadScreenshots } from './upload.js'
 import { uploadReplays } from './upload-replays.js'
 import { generateCommentBody } from './github/comment.js'
+import { findReplayVideos } from './utils/find-replay-videos.js'
 import type { StorageConfig } from './storage/index.js'
 import type { ODiffOptions } from 'odiff-bin'
 
@@ -68,6 +69,19 @@ function buildStorageConfig(storageType: string): StorageConfig {
   }
 
   throw new Error(`Unknown storage type: ${storageType}. Supported types: s3, vercel-blob`)
+}
+
+function writeReplayOutput(outputPath: string, replays: unknown[]): void {
+  fs.writeFileSync(
+    outputPath,
+    JSON.stringify(replays, null, 2)
+  )
+  console.log(`\n✓ Saved replay URLs to ${outputPath}`)
+
+  if (process.env.GITHUB_OUTPUT) {
+    const outputLine = `replays=${JSON.stringify(replays)}\n`
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLine)
+  }
 }
 
 program
@@ -240,6 +254,21 @@ program
     try {
       const { directory, storage: storageType, pr, runId, pathTemplate, output } = options
       const githubEvent = readGitHubEvent()
+      const outputPath = output || process.env.REPLAYS_OUTPUT_FILE || 'replay-urls.json'
+
+      if (options.allowEmpty) {
+        let videos: string[] = []
+        if (fs.existsSync(directory)) {
+          videos = findReplayVideos(directory)
+        }
+
+        if (videos.length === 0) {
+          console.log(`No replay videos found in ${directory}`)
+          writeReplayOutput(outputPath, [])
+          return
+        }
+      }
+
       const storageConfig = buildStorageConfig(storageType)
 
       const prNumber = pr || process.env.PR_NUMBER
@@ -265,17 +294,7 @@ program
         allowEmpty: options.allowEmpty,
       })
 
-      const outputPath = output || process.env.REPLAYS_OUTPUT_FILE || 'replay-urls.json'
-      fs.writeFileSync(
-        outputPath,
-        JSON.stringify(replays, null, 2)
-      )
-      console.log(`\n✓ Saved replay URLs to ${outputPath}`)
-
-      if (process.env.GITHUB_OUTPUT) {
-        const outputLine = `replays=${JSON.stringify(replays)}\n`
-        fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLine)
-      }
+      writeReplayOutput(outputPath, replays)
     } catch (error: any) {
       console.error('Error:', error.message)
       process.exit(1)
