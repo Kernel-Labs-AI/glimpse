@@ -12,6 +12,18 @@ npm install --save-dev @kernel-labs/glimpse
 
 Glimpse expects Node 22 or newer.
 
+## What Reviewers See
+
+Glimpse compares screenshots by relative path, filters changes below your configured threshold, and posts the remaining screenshots or generated diffs to one sticky PR comment.
+
+| Baseline on the target branch | Screenshot from the pull request |
+| --- | --- |
+| ![Baseline analytics dashboard](docs/images/visual-diff-baseline.png) | ![Changed analytics dashboard](docs/images/visual-diff-current.png) |
+
+With `--diff-mode diffs`, the PR comment shows the generated diff. Changed pixels are highlighted in red; this example has a `2.66%` pixel diff.
+
+![Generated visual diff with changed pixels highlighted](docs/images/visual-diff-output.png)
+
 ## Capture Screenshots
 
 Use the Playwright helpers in tests that should produce PR screenshots.
@@ -219,6 +231,107 @@ npx glimpse upload \
 This downloads each baseline image from the rendered baseline path, runs odiff locally in CI, and uploads only selected screenshots or generated diff images.
 
 If the target branch has no stored screenshot for a path, Glimpse treats the current screenshot as a new high-signal image and includes it. The same fallback applies when diff mode is enabled without a usable baseline source: Glimpse skips odiff and uploads the current screenshots, marked as missing baselines.
+
+### Complete GitHub Actions Setup
+
+The following workflow publishes commit-addressed baselines on every push to `main`, then uses the pull request's base SHA to find the matching baseline. Replace the build and test commands with the commands used by your project.
+
+```yaml
+name: Visual diffs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:e2e
+
+      - name: Publish target-branch baseline
+        if: github.event_name == 'push'
+        env:
+          VERCEL_BLOB_READ_WRITE_TOKEN: ${{ secrets.VERCEL_BLOB_READ_WRITE_TOKEN }}
+        run: |
+          npx glimpse upload \
+            --directory ./test-results/pr-screenshots \
+            --storage vercel-blob \
+            --path-template 'glimpse-screenshots/commit-{commit}/{relativePath}'
+
+      - name: Generate and upload pull-request diffs
+        if: github.event_name == 'pull_request'
+        env:
+          VERCEL_BLOB_READ_WRITE_TOKEN: ${{ secrets.VERCEL_BLOB_READ_WRITE_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          npx glimpse upload \
+            --directory ./test-results/pr-screenshots \
+            --storage vercel-blob \
+            --path-template 'glimpse-screenshots/pr-{pr}/run-{runId}/{relativePath}' \
+            --diff-base-from-storage \
+            --diff-base-path-template 'glimpse-screenshots/commit-{commit}/{relativePath}' \
+            --diff-mode diffs \
+            --min-diff-percentage 1
+
+      - name: Post or update the pull-request comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const { postToGitHub } = await import(
+              '${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js'
+            )
+            const screenshots = JSON.parse(
+              fs.readFileSync('screenshot-urls.json', 'utf8')
+            )
+
+            await postToGitHub({
+              screenshots,
+              prNumber: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              runId: context.runId,
+              repositoryUrl: context.payload.repository.html_url,
+              token: process.env.GITHUB_TOKEN
+            }, github)
+```
+
+The baseline job must capture the same screenshot paths as the pull-request job. Glimpse matches `chromium/dashboard.png` only with a baseline stored at that same relative path.
+
+### Baseline Lifecycle
+
+- Publish a baseline for every target-branch commit that pull requests can use as a base SHA. A branch-only path such as `main/{relativePath}` can race when `main` advances after a pull request is opened; commit-addressed paths avoid that ambiguity.
+- Keep baseline objects at least as long as pull requests can remain open. If storage cleanup removes `commit-{baseSha}`, Glimpse reports those entries as new screenshots instead of generated diffs.
+- Run the same browser version, viewport, fonts, locale, timezone, data, and animation-disabling setup in baseline and pull-request jobs. Otherwise environmental drift can create false visual changes.
+- Secrets are normally unavailable to workflows from untrusted forks. Choose a storage/authentication policy for forked pull requests before making the visual-diff job required.
+
+### Troubleshooting Visual Diffs
+
+- **Every image says `new screenshot`:** confirm that the baseline workflow ran for the exact pull request base SHA and that `--diff-base-path-template` matches the baseline upload path.
+- **Expected images are missing:** Glimpse recursively reads only lowercase `.png` files from `--directory`, and pixel diffs below `--min-diff-percentage` are intentionally omitted.
+- **Unrelated areas keep changing:** stabilize the test before lowering the threshold. Freeze clocks and seeded data, wait for fonts and images, disable transitions, and use a fixed viewport.
+- **The baseline is never found:** prefer `{relativePath}` over `{filename}` when screenshots are split across browser or test directories. Flattening paths can create collisions.
+- **No comment appears:** an empty first result intentionally creates no comment. A later empty result updates an existing Glimpse comment to say that no screenshots or diffs were selected.
 
 ## Storage Configuration
 
