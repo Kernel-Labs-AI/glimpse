@@ -3,4 +3,6 @@ dist/
 *.log
 .env
 playwright-report/
+test-results/
+docs/demo/playwright/.last-run.json
 .DS_Store

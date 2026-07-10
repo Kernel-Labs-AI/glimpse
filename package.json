@@ -25,8 +25,8 @@
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && tsc",
-    "demo:assets": "node examples/demo-app/capture.mjs",
     "demo:serve": "node examples/demo-app/server.mjs",
+    "demo:test": "npm run build && playwright test --config examples/demo-app/playwright.config.ts",
     "dev": "tsc --watch",
     "prepare": "npm run build",
     "prepublishOnly": "npm run build",

@@ -34,3 +34,6 @@ jobs:
 
       - name: Run tests
         run: npx playwright test
+
+      - name: Run demo app tests
+        run: npm run demo:test

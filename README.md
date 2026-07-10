@@ -16,9 +16,9 @@ Glimpse expects Node 22 or newer.
 
 Glimpse compares screenshots by relative path, filters changes below your configured threshold, and posts the remaining screenshots or generated diffs to one sticky PR comment.
 
-[![Glimpse visual diff demo](docs/demo/glimpse-demo.gif)](docs/demo/glimpse-demo.mp4)
+The [example dashboard](examples/demo-app/README.md) includes a real Playwright screenshot test using Glimpse and a separate multi-interaction replay test.
 
-_Click the preview to open the full demo video. These assets are reproducibly generated from the [example dashboard](examples/demo-app/README.md)._
+▶ [Watch the native Playwright replay with multiple interactions](docs/demo/playwright/replay-records-a-real-multi-interaction-dashboard-flow/video.webm)
 
 | Baseline on the target branch | Screenshot from the pull request |
 | --- | --- |

@@ -12,7 +12,8 @@ jobs:
 
     permissions:
       contents: read
-      pull-requests: write
+      issues: write
+      pull-requests: read
 
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +31,8 @@ jobs:
       - name: Build app
         run: npm run build
 
-      - name: Run tests with screenshots
-        run: npm run test:e2e
-        # Your tests should use the screenshot helpers to capture screenshots
+      - name: Run demo Playwright tests
+        run: npm run demo:test
 
       # Upload to S3 using the library
       - name: Upload screenshots to S3
@@ -46,8 +46,23 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           npx glimpse upload \
-            --directory ./test-results \
+            --directory ./test-results/pr-screenshots \
             --storage s3
+
+      - name: Upload Playwright replays to S3
+        if: always()
+        env:
+          AWS_REGION: us-east-1
+          S3_BUCKET: my-screenshots
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          npx glimpse upload-replays \
+            --directory ./docs/demo/playwright \
+            --storage s3 \
+            --allow-empty
 
       # Post screenshots to PR comment
       - name: Post screenshots to PR
@@ -59,9 +74,11 @@ jobs:
             const { postToGitHub } = await import('${{ github.workspace }}/node_modules/@kernel-labs/glimpse/dist/index.js');
 
             const screenshots = JSON.parse(fs.readFileSync('screenshot-urls.json', 'utf8'));
+            const replays = JSON.parse(fs.readFileSync('replay-urls.json', 'utf8'));
 
             await postToGitHub({
               screenshots,
+              replays,
               prNumber: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,

@@ -78,6 +78,21 @@
         margin-bottom: 32px;
       }
 
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .period {
+        border: 1px solid #33405a;
+        border-radius: 10px;
+        padding: 11px 34px 11px 13px;
+        background: #111724;
+        color: #d9dfeb;
+        font-size: 13px;
+      }
+
       h1 {
         margin: 0 0 7px;
         font-size: 32px;
@@ -175,10 +190,25 @@
       }
 
       .bar {
+        width: 100%;
+        border: 0;
+        padding: 0;
         height: calc(var(--height) * 1px);
         border-radius: 7px 7px 0 0;
         background: linear-gradient(180deg, #a784f6, #6d28d9);
         transition: height 520ms cubic-bezier(.2,.8,.2,1), background 420ms ease, box-shadow 420ms ease;
+        cursor: pointer;
+      }
+
+      .bar:focus-visible,
+      .bar.is-selected {
+        outline: 3px solid #d8c5ff;
+        outline-offset: 3px;
+      }
+
+      .chart-insight {
+        min-width: 128px;
+        text-align: right;
       }
 
       .state-current .revenue-card {
@@ -247,6 +277,50 @@
         animation-duration: 0s !important;
       }
 
+      dialog {
+        width: min(430px, calc(100vw - 40px));
+        border: 1px solid #3a4660;
+        border-radius: 18px;
+        padding: 0;
+        background: #111724;
+        color: #f6f7fb;
+        box-shadow: 0 30px 100px rgba(0, 0, 0, 0.65);
+      }
+
+      dialog::backdrop {
+        background: rgba(4, 7, 13, 0.72);
+        backdrop-filter: blur(5px);
+      }
+
+      .dialog-content { padding: 28px; }
+      .dialog-content h2 { margin: 0 0 8px; font-size: 22px; }
+      .dialog-content p { margin: 0 0 24px; color: #a9b6c9; line-height: 1.5; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+      .dialog-actions button {
+        border: 1px solid #3a4660;
+        border-radius: 9px;
+        padding: 10px 14px;
+        background: #1b2233;
+        color: #f6f7fb;
+        font-weight: 750;
+      }
+      .dialog-actions .primary { border-color: #7c3aed; background: #7c3aed; }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 8;
+        border: 1px solid #285c4e;
+        border-radius: 12px;
+        padding: 13px 16px;
+        background: #102a25;
+        color: #9ff4dc;
+        font-size: 13px;
+        font-weight: 750;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+      }
+
       @media (max-width: 800px) {
         body { overflow: auto; }
         .app { grid-template-columns: 1fr; }
@@ -274,7 +348,14 @@
             <h1>Revenue overview</h1>
             <p class="subtitle">Performance across the last six months</p>
           </div>
-          <button class="export changed" type="button">Export report</button>
+          <div class="header-actions">
+            <select class="period" aria-label="Reporting period">
+              <option value="6m">Last 6 months</option>
+              <option value="90d">Last 90 days</option>
+              <option value="30d">Last 30 days</option>
+            </select>
+            <button class="export changed" type="button">Export report</button>
+          </div>
         </header>
 
         <section class="metrics" aria-label="Revenue metrics">
@@ -296,18 +377,31 @@
         </section>
 
         <section class="chart" aria-label="Monthly revenue chart">
-          <div class="chart-header"><strong>Monthly revenue</strong><span>Jan – Jun</span></div>
-          <div class="bars" aria-hidden="true">
-            <div class="bar" style="--height: 82"></div>
-            <div class="bar" style="--height: 116"></div>
-            <div class="bar" style="--height: 96"></div>
-            <div class="bar" style="--height: 144"></div>
-            <div class="bar changed-bar changed" style="--height: 126"></div>
-            <div class="bar" style="--height: 162"></div>
+          <div class="chart-header"><strong>Monthly revenue</strong><span class="chart-insight" data-insight>Jan – Jun</span></div>
+          <div class="bars">
+            <button class="bar" type="button" data-month="January" data-value="$11,820" aria-label="January revenue, $11,820" style="--height: 82"></button>
+            <button class="bar" type="button" data-month="February" data-value="$13,460" aria-label="February revenue, $13,460" style="--height: 116"></button>
+            <button class="bar" type="button" data-month="March" data-value="$12,980" aria-label="March revenue, $12,980" style="--height: 96"></button>
+            <button class="bar" type="button" data-month="April" data-value="$16,220" aria-label="April revenue, $16,220" style="--height: 144"></button>
+            <button class="bar changed-bar changed" type="button" data-month="May" data-value="$18,420" aria-label="May revenue, $18,420" style="--height: 126"></button>
+            <button class="bar" type="button" data-month="June" data-value="$18,420" aria-label="June revenue, $18,420" style="--height: 162"></button>
           </div>
         </section>
       </main>
     </div>
+
+    <dialog data-export-dialog>
+      <div class="dialog-content">
+        <h2>Export revenue report</h2>
+        <p>Your report includes the selected reporting period, headline metrics, and monthly revenue breakdown.</p>
+        <div class="dialog-actions">
+          <button type="button" data-cancel-export>Cancel</button>
+          <button class="primary" type="button" data-download-report>Download CSV</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" role="status" data-toast hidden>Report downloaded successfully</div>
 
     <div class="demo-controls" aria-label="Demo state">
       <button type="button" data-state="baseline" aria-pressed="true">Baseline</button>
@@ -323,6 +417,18 @@
       const revenue = document.querySelector('[data-revenue]')
       const revenueDelta = document.querySelector('[data-revenue-delta]')
       const controls = [...document.querySelectorAll('[data-state]')]
+      const period = document.querySelector('.period')
+      const bars = [...document.querySelectorAll('.bar')]
+      const insight = document.querySelector('[data-insight]')
+      const exportButton = document.querySelector('.export')
+      const exportDialog = document.querySelector('[data-export-dialog]')
+      const toast = document.querySelector('[data-toast]')
+
+      const periods = {
+        '6m': { revenue: '$91,320', delta: '+18.7%', label: 'Jan – Jun', heights: [82, 116, 96, 144, 152, 162] },
+        '90d': { revenue: '$52,840', delta: '+14.2%', label: 'Last 90 days', heights: [54, 76, 68, 105, 132, 148] },
+        '30d': { revenue: '$18,420', delta: '+9.8%', label: 'Last 30 days', heights: [42, 58, 70, 92, 126, 158] },
+      }
 
       if (isDemo) document.body.classList.add('demo')
       if (isCapture) document.body.classList.add('capture')
@@ -337,8 +443,31 @@
         })
       }
 
+      function setPeriod(value) {
+        const selected = periods[value]
+        revenue.textContent = selected.revenue
+        revenueDelta.textContent = selected.delta
+        insight.textContent = selected.label
+        bars.forEach((bar, index) => bar.style.setProperty('--height', selected.heights[index]))
+      }
+
       controls.forEach((button) => {
         button.addEventListener('click', () => setState(button.dataset.state))
+      })
+
+      period.addEventListener('change', () => setPeriod(period.value))
+      bars.forEach((bar) => {
+        bar.addEventListener('click', () => {
+          bars.forEach((candidate) => candidate.classList.remove('is-selected'))
+          bar.classList.add('is-selected')
+          insight.textContent = `${bar.dataset.month}: ${bar.dataset.value}`
+        })
+      })
+      exportButton.addEventListener('click', () => exportDialog.showModal())
+      document.querySelector('[data-cancel-export]').addEventListener('click', () => exportDialog.close())
+      document.querySelector('[data-download-report]').addEventListener('click', () => {
+        exportDialog.close()
+        toast.hidden = false
       })
 
       setState(initialState)
