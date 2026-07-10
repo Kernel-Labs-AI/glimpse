@@ -31,6 +31,17 @@ function formatDisplayName(name: string): string {
     .replace(/_/g, ' ')
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\|/g, '&#124;')
+    .replace(/[\r\n]+/g, ' ')
+}
+
 function formatDiffPercentage(percentage: number): string {
   const precision = percentage < 1 ? 2 : 1
   return `${percentage.toFixed(precision).replace(/\.0$/, '')}%`
@@ -68,12 +79,13 @@ function generateThumbnailGrid(screenshots: UploadedScreenshot[]): string {
   for (let i = 0; i < screenshots.length; i += 3) {
     const row = screenshots.slice(i, i + 3)
     const cells = row.map(s => {
-      const displayName = formatDisplayName(s.displayName || s.sourceName || s.name)
+      const displayName = escapeHtml(formatDisplayName(s.displayName || s.sourceName || s.name))
+      const url = escapeHtml(s.url)
       const diffMetadata = formatDiffMetadata(s)
       const caption = diffMetadata
         ? `${displayName}<br><sub>${diffMetadata}</sub>`
         : displayName
-      return `<a href="${s.url}"><img src="${s.url}" width="280"><br>${caption}</a>`
+      return `<a href="${url}"><img src="${url}" width="280"><br>${caption}</a>`
     })
     // Pad with empty cells if needed
     while (cells.length < 3) {
@@ -97,8 +109,9 @@ function generateReplayGrid(replays: UploadedReplay[]): string {
   for (let i = 0; i < replays.length; i += 2) {
     const row = replays.slice(i, i + 2)
     const cells = row.map(replay => {
-      const displayName = formatDisplayName(replay.displayName || replay.relativePath || replay.name)
-      return `<video src="${replay.url}" width="360" controls></video><br><a href="${replay.url}">${displayName}</a>`
+      const displayName = escapeHtml(formatDisplayName(replay.displayName || replay.relativePath || replay.name))
+      const url = escapeHtml(replay.url)
+      return `<a href="${url}">▶ ${displayName}</a>`
     })
     while (cells.length < 2) {
       cells.push('')
@@ -148,7 +161,7 @@ export function generateCommentBody(options: GitHubCommentOptions): string {
       const count = groupScreenshots.length
       const groupHasDiffMetadata = groupScreenshots.some(s => s.diff)
       commentBody += `<details>\n`
-      commentBody += `<summary><strong>${group}</strong> (${formatItemCount(count, groupHasDiffMetadata)})</summary>\n\n`
+      commentBody += `<summary><strong>${escapeHtml(group)}</strong> (${formatItemCount(count, groupHasDiffMetadata)})</summary>\n\n`
       commentBody += generateThumbnailGrid(groupScreenshots)
       commentBody += '\n</details>\n\n'
     }
@@ -189,15 +202,19 @@ export async function postToGitHub(
   const { screenshots, replays = [], prNumber, owner, repo } = options
 
   // Find existing comment
-  const { data: comments } = await githubClient.rest.issues.listComments({
+  const listParams = {
     owner,
     repo,
     issue_number: prNumber,
-  })
+    per_page: 100,
+  }
+  const comments = githubClient.paginate
+    ? await githubClient.paginate(githubClient.rest.issues.listComments, listParams)
+    : (await githubClient.rest.issues.listComments(listParams)).data
 
   const botComment = comments.find((comment: any) =>
-    comment.user.type === 'Bot' &&
-    comment.body.includes('📸 UI Screenshots')
+    comment.user?.type === 'Bot' &&
+    comment.body?.includes('📸 UI Screenshots')
   )
 
   if (screenshots.length === 0 && replays.length === 0 && !botComment) {

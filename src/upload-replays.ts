@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs'
-import { ReplayUploadOptions, UploadedReplay } from './storage/index.js'
+import { ReplayUploadOptions, StorageProvider, UploadedReplay } from './storage/index.js'
 import { createStorageProvider } from './storage/provider.js'
 import { findReplayVideos } from './utils/find-replay-videos.js'
 import { generatePathFromTemplate } from './utils/path-template.js'
@@ -25,7 +25,8 @@ function getReplayDisplayName(relativePath: string): string {
  * Upload Playwright replay videos to the configured storage provider.
  */
 export async function uploadReplays(
-  options: ReplayUploadOptions
+  options: ReplayUploadOptions,
+  providerOverride?: StorageProvider
 ): Promise<UploadedReplay[]> {
   const {
     directory,
@@ -58,7 +59,7 @@ export async function uploadReplays(
 
   console.log(`Found ${videos.length} replay videos to upload`)
 
-  const provider = createStorageProvider(storage)
+  const provider = providerOverride || createStorageProvider(storage)
   const uploadedReplays: UploadedReplay[] = []
 
   for (const videoPath of videos) {

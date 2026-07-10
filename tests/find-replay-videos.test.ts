@@ -46,5 +46,6 @@ test.describe('getContentType', () => {
     expect(getContentType('video.webm')).toBe('video/webm')
     expect(getContentType('video.mp4')).toBe('video/mp4')
     expect(getContentType('video.mov')).toBe('video/quicktime')
+    expect(getContentType('video.m4v')).toBe('video/x-m4v')
   })
 })

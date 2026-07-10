@@ -395,7 +395,7 @@ S3_BUCKET=my-screenshots \
 npx glimpse upload --directory ./test-results/pr-screenshots --storage s3
 ```
 
-Supabase Storage users can use the S3 adapter with Supabase's S3-compatible endpoint and credentials via `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`.
+Artifacts linked from a GitHub comment must be publicly readable. If you set `S3_PUBLIC_READ=false`, serve the bucket through a public CDN or another public URL layer; Glimpse does not generate presigned comment URLs.
 
 ## CLI Reference
 

@@ -293,7 +293,7 @@ test.describe('generateCommentBody', () => {
   })
 
   test.describe('replay videos', () => {
-    test('should render uploaded Playwright replays as videos', () => {
+    test('should render uploaded Playwright replays as links', () => {
       const screenshots: UploadedScreenshot[] = [
         { name: 'homepage.png', url: 'https://example.com/homepage.png', path: 'homepage.png' },
       ]
@@ -311,8 +311,25 @@ test.describe('generateCommentBody', () => {
       const comment = generateCommentBody({ ...baseOptions, screenshots, replays })
 
       expect(comment).toContain('## 🎥 Playwright Replays')
-      expect(comment).toContain('<video src="https://example.com/homepage.webm" width="360" controls></video>')
-      expect(comment).toContain('<a href="https://example.com/homepage.webm">homepage flow</a>')
+      expect(comment).toContain('<a href="https://example.com/homepage.webm">▶ homepage flow</a>')
+      expect(comment).not.toContain('<video')
+    })
+
+    test('should escape replay labels and URLs before inserting them into HTML', () => {
+      const replays: UploadedReplay[] = [
+        {
+          name: 'video.webm',
+          displayName: 'checkout | <script>alert(1)</script>',
+          url: 'https://example.com/video.webm?download=1&name="replay"',
+          path: 'pr-123/replays/video.webm',
+        },
+      ]
+
+      const comment = generateCommentBody({ ...baseOptions, screenshots: [], replays })
+
+      expect(comment).toContain('checkout &#124; &lt;script&gt;alert(1)&lt;/script&gt;')
+      expect(comment).toContain('download=1&amp;name=&quot;replay&quot;')
+      expect(comment).not.toContain('<script>')
     })
 
     test('should allow replay-only comments', () => {

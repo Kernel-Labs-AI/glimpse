@@ -71,15 +71,16 @@ export class S3Storage implements StorageProvider {
   async upload(filePath: string, remotePath: string, options: { contentType?: string } = {}): Promise<string> {
     await this.initialize()
 
-    const fileBuffer = fs.readFileSync(filePath)
-    const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2)
+    const fileSize = fs.statSync(filePath).size
+    const fileSizeMB = (fileSize / 1024 / 1024).toFixed(2)
 
     console.log(`Uploading ${remotePath} (${fileSizeMB}MB) to S3...`)
 
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: remotePath,
-      Body: fileBuffer,
+      Body: fs.createReadStream(filePath),
+      ContentLength: fileSize,
       ContentType: options.contentType || 'image/png',
       ACL: this.publicRead ? 'public-read' : undefined,
     })
