@@ -16,11 +16,15 @@ Glimpse expects Node 22 or newer.
 
 Glimpse compares screenshots by relative path, filters changes below your configured threshold, and posts the remaining screenshots or generated diffs to one sticky PR comment.
 
+[![Glimpse visual diff demo](docs/demo/glimpse-demo.gif)](docs/demo/glimpse-demo.mp4)
+
+_Click the preview to open the full demo video. These assets are reproducibly generated from the [example dashboard](examples/demo-app/README.md)._
+
 | Baseline on the target branch | Screenshot from the pull request |
 | --- | --- |
 | ![Baseline analytics dashboard](docs/images/visual-diff-baseline.png) | ![Changed analytics dashboard](docs/images/visual-diff-current.png) |
 
-With `--diff-mode diffs`, the PR comment shows the generated diff. Changed pixels are highlighted in red; this example has a `2.66%` pixel diff.
+With `--diff-mode diffs`, the PR comment shows the generated diff. Changed pixels are highlighted in red; this example has a `2.37%` pixel diff.
 
 ![Generated visual diff with changed pixels highlighted](docs/images/visual-diff-output.png)
 

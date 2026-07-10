@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glimpse demo fixture</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #080b12;
+        color: #f6f7fb;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 88% 4%, rgba(124, 58, 237, 0.16), transparent 30%),
+          #080b12;
+      }
+
+      button { font: inherit; }
+
+      .app {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        width: 100vw;
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        padding: 36px 24px;
+        border-right: 1px solid #263044;
+        background: rgba(13, 18, 29, 0.94);
+      }
+
+      .brand {
+        margin: 0 0 48px;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .brand span { color: #a979ff; }
+
+      .nav {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nav a {
+        padding: 12px 14px;
+        border-radius: 9px;
+        color: #9eabc0;
+        font-size: 14px;
+        text-decoration: none;
+      }
+
+      .nav a[aria-current="page"] {
+        background: #1b2233;
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      main {
+        padding: 48px 54px;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 32px;
+      }
+
+      h1 {
+        margin: 0 0 7px;
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.05em;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: #9eabc0;
+        font-size: 14px;
+      }
+
+      .export {
+        border: 0;
+        border-radius: 10px;
+        padding: 12px 18px;
+        background: #7c3aed;
+        color: white;
+        font-size: 13px;
+        font-weight: 800;
+        transition: background 420ms ease, transform 420ms ease, box-shadow 420ms ease;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .metric,
+      .chart {
+        border: 1px solid #283349;
+        background: #111724;
+      }
+
+      .metric {
+        min-height: 106px;
+        padding: 22px;
+        border-radius: 14px;
+        transition: border-color 420ms ease, box-shadow 420ms ease;
+      }
+
+      .metric-label {
+        margin-bottom: 10px;
+        color: #a9b6c9;
+        font-size: 13px;
+      }
+
+      .metric-value {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .metric-value strong {
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.045em;
+      }
+
+      .delta {
+        color: #2de3b0;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .chart {
+        height: 310px;
+        padding: 24px 26px 28px;
+        border-radius: 14px;
+      }
+
+      .chart-header {
+        display: flex;
+        justify-content: space-between;
+        color: #a9b6c9;
+        font-size: 13px;
+      }
+
+      .chart-header strong {
+        color: #f6f7fb;
+        font-size: 16px;
+      }
+
+      .bars {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        align-items: end;
+        gap: 18px;
+        height: 210px;
+        padding-top: 24px;
+        border-bottom: 1px solid #313c52;
+      }
+
+      .bar {
+        height: calc(var(--height) * 1px);
+        border-radius: 7px 7px 0 0;
+        background: linear-gradient(180deg, #a784f6, #6d28d9);
+        transition: height 520ms cubic-bezier(.2,.8,.2,1), background 420ms ease, box-shadow 420ms ease;
+      }
+
+      .state-current .revenue-card {
+        border-left: 5px solid #a979ff;
+        padding-left: 18px;
+      }
+
+      .state-current .export {
+        background: #ec4899;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 28px rgba(236, 72, 153, 0.2);
+      }
+
+      .state-current .changed-bar {
+        height: 152px;
+        background: linear-gradient(180deg, #f6a3d2, #db2777);
+      }
+
+      .state-diff .changed {
+        outline: 4px solid #ff2d55;
+        outline-offset: 3px;
+      }
+
+      .state-diff .changed-bar {
+        background: #ff2d55;
+        box-shadow: 0 0 0 4px #ff2d55;
+      }
+
+      .demo-controls {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        z-index: 5;
+        display: none;
+        grid-template-columns: repeat(3, auto);
+        gap: 6px;
+        padding: 6px;
+        border: 1px solid #33405a;
+        border-radius: 14px;
+        background: rgba(13, 18, 29, 0.94);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        transform: translateX(-50%);
+        backdrop-filter: blur(14px);
+      }
+
+      .demo .demo-controls { display: grid; }
+
+      .demo-controls button {
+        border: 0;
+        border-radius: 9px;
+        padding: 10px 14px;
+        background: transparent;
+        color: #a9b6c9;
+        font-size: 12px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      .demo-controls button[aria-pressed="true"] {
+        background: #2a2140;
+        color: #ffffff;
+      }
+
+      .capture *, .capture *::before, .capture *::after {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+      }
+
+      @media (max-width: 800px) {
+        body { overflow: auto; }
+        .app { grid-template-columns: 1fr; }
+        .sidebar { display: none; }
+        main { padding: 32px 22px 100px; }
+        .metrics { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" data-testid="demo-app">
+      <aside class="sidebar">
+        <p class="brand">Acme <span>Analytics</span></p>
+        <nav class="nav" aria-label="Primary navigation">
+          <a href="#" aria-current="page">Overview</a>
+          <a href="#">Reports</a>
+          <a href="#">Customers</a>
+          <a href="#">Settings</a>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="header">
+          <div>
+            <h1>Revenue overview</h1>
+            <p class="subtitle">Performance across the last six months</p>
+          </div>
+          <button class="export changed" type="button">Export report</button>
+        </header>
+
+        <section class="metrics" aria-label="Revenue metrics">
+          <article class="metric revenue-card changed">
+            <div class="metric-label">Total revenue</div>
+            <div class="metric-value">
+              <strong data-revenue>$84,240</strong>
+              <span class="delta" data-revenue-delta>+12.4%</span>
+            </div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Active customers</div>
+            <div class="metric-value"><strong>1,842</strong><span class="delta">+8.1%</span></div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Conversion</div>
+            <div class="metric-value"><strong>4.28%</strong><span class="delta">+0.6%</span></div>
+          </article>
+        </section>
+
+        <section class="chart" aria-label="Monthly revenue chart">
+          <div class="chart-header"><strong>Monthly revenue</strong><span>Jan – Jun</span></div>
+          <div class="bars" aria-hidden="true">
+            <div class="bar" style="--height: 82"></div>
+            <div class="bar" style="--height: 116"></div>
+            <div class="bar" style="--height: 96"></div>
+            <div class="bar" style="--height: 144"></div>
+            <div class="bar changed-bar changed" style="--height: 126"></div>
+            <div class="bar" style="--height: 162"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="demo-controls" aria-label="Demo state">
+      <button type="button" data-state="baseline" aria-pressed="true">Baseline</button>
+      <button type="button" data-state="current" aria-pressed="false">Show proposed change</button>
+      <button type="button" data-state="diff" aria-pressed="false">Highlight diff</button>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search)
+      const initialState = params.get('variant') || 'baseline'
+      const isDemo = params.get('demo') === '1'
+      const isCapture = params.get('capture') === '1'
+      const revenue = document.querySelector('[data-revenue]')
+      const revenueDelta = document.querySelector('[data-revenue-delta]')
+      const controls = [...document.querySelectorAll('[data-state]')]
+
+      if (isDemo) document.body.classList.add('demo')
+      if (isCapture) document.body.classList.add('capture')
+
+      function setState(state) {
+        document.body.classList.remove('state-baseline', 'state-current', 'state-diff')
+        document.body.classList.add(`state-${state}`)
+        revenue.textContent = state === 'baseline' ? '$84,240' : '$91,320'
+        revenueDelta.textContent = state === 'baseline' ? '+12.4%' : '+18.7%'
+        controls.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.state === state))
+        })
+      }
+
+      controls.forEach((button) => {
+        button.addEventListener('click', () => setState(button.dataset.state))
+      })
+
+      setState(initialState)
+      window.__demoReady = true
+    </script>
+  </body>
+</html>
