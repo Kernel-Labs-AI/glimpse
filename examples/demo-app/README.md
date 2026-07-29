@@ -28,7 +28,9 @@ Both runs capture `revenue-overview.png`, so Glimpse can match the screenshot by
 
 ```bash
 npx glimpse upload-replays \
-  --directory ./docs/demo/playwright \
+  --directory ./test-results/playwright-replays \
   --storage s3 \
   --allow-empty
 ```
+
+The generated replay directory is ignored by Git, so local and CI runs cannot accidentally fall back to the checked-in documentation sample.

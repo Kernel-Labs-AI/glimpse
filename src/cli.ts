@@ -10,6 +10,9 @@ import type { StorageConfig } from './storage/index.js'
 import type { ODiffOptions } from 'odiff-bin'
 
 const program = new Command()
+const packageVersion = JSON.parse(
+  fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+).version as string
 
 function parseNumberOption(value: string | undefined, name: string, min: number, max: number): number | undefined {
   if (value === undefined) return undefined
@@ -87,7 +90,7 @@ function writeReplayOutput(outputPath: string, replays: unknown[]): void {
 program
   .name('glimpse')
   .description('Upload Playwright screenshots and replay videos to S3 or Vercel Blob and generate PR comments')
-  .version('0.1.0')
+  .version(packageVersion)
 
 program
   .command('upload')

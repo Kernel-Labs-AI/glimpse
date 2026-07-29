@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
-  outputDir: '../../docs/demo/playwright',
+  outputDir: '../../test-results/playwright-replays',
   fullyParallel: false,
   reporter: 'line',
   use: {

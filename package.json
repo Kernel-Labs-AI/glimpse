@@ -1,6 +1,6 @@
 {
   "name": "@kernel-labs/glimpse",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Upload Playwright screenshots and replay videos to S3 or Vercel Blob and post GitHub PR comments",
   "type": "module",
   "main": "./dist/index.js",

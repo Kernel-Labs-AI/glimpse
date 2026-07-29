@@ -60,7 +60,7 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           npx glimpse upload-replays \
-            --directory ./docs/demo/playwright \
+            --directory ./test-results/playwright-replays \
             --storage s3 \
             --allow-empty
 
