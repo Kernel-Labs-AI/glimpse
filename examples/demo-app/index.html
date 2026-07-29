@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glimpse demo fixture</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #080b12;
+        color: #f6f7fb;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 88% 4%, rgba(124, 58, 237, 0.16), transparent 30%),
+          #080b12;
+      }
+
+      button { font: inherit; }
+
+      .app {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        width: 100vw;
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        padding: 36px 24px;
+        border-right: 1px solid #263044;
+        background: rgba(13, 18, 29, 0.94);
+      }
+
+      .brand {
+        margin: 0 0 48px;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .brand span { color: #a979ff; }
+
+      .nav {
+        display: grid;
+        gap: 10px;
+      }
+
+      .nav a {
+        padding: 12px 14px;
+        border-radius: 9px;
+        color: #9eabc0;
+        font-size: 14px;
+        text-decoration: none;
+      }
+
+      .nav a[aria-current="page"] {
+        background: #1b2233;
+        color: #ffffff;
+        font-weight: 700;
+      }
+
+      main {
+        padding: 48px 54px;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 32px;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .period {
+        border: 1px solid #33405a;
+        border-radius: 10px;
+        padding: 11px 34px 11px 13px;
+        background: #111724;
+        color: #d9dfeb;
+        font-size: 13px;
+      }
+
+      h1 {
+        margin: 0 0 7px;
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.05em;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: #9eabc0;
+        font-size: 14px;
+      }
+
+      .export {
+        border: 0;
+        border-radius: 10px;
+        padding: 12px 18px;
+        background: #7c3aed;
+        color: white;
+        font-size: 13px;
+        font-weight: 800;
+        transition: background 420ms ease, transform 420ms ease, box-shadow 420ms ease;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .metric,
+      .chart {
+        border: 1px solid #283349;
+        background: #111724;
+      }
+
+      .metric {
+        min-height: 106px;
+        padding: 22px;
+        border-radius: 14px;
+        transition: border-color 420ms ease, box-shadow 420ms ease;
+      }
+
+      .metric-label {
+        margin-bottom: 10px;
+        color: #a9b6c9;
+        font-size: 13px;
+      }
+
+      .metric-value {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+
+      .metric-value strong {
+        font-size: 32px;
+        line-height: 1;
+        letter-spacing: -0.045em;
+      }
+
+      .delta {
+        color: #2de3b0;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .chart {
+        height: 310px;
+        padding: 24px 26px 28px;
+        border-radius: 14px;
+      }
+
+      .chart-header {
+        display: flex;
+        justify-content: space-between;
+        color: #a9b6c9;
+        font-size: 13px;
+      }
+
+      .chart-header strong {
+        color: #f6f7fb;
+        font-size: 16px;
+      }
+
+      .bars {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        align-items: end;
+        gap: 18px;
+        height: 210px;
+        padding-top: 24px;
+        border-bottom: 1px solid #313c52;
+      }
+
+      .bar {
+        width: 100%;
+        border: 0;
+        padding: 0;
+        height: calc(var(--height) * 1px);
+        border-radius: 7px 7px 0 0;
+        background: linear-gradient(180deg, #a784f6, #6d28d9);
+        transition: height 520ms cubic-bezier(.2,.8,.2,1), background 420ms ease, box-shadow 420ms ease;
+        cursor: pointer;
+      }
+
+      .bar:focus-visible,
+      .bar.is-selected {
+        outline: 3px solid #d8c5ff;
+        outline-offset: 3px;
+      }
+
+      .chart-insight {
+        min-width: 128px;
+        text-align: right;
+      }
+
+      .state-current .revenue-card {
+        border-left: 5px solid #a979ff;
+        padding-left: 18px;
+      }
+
+      .state-current .export {
+        background: #ec4899;
+        transform: translateY(-1px);
+        box-shadow: 0 8px 28px rgba(236, 72, 153, 0.2);
+      }
+
+      .state-current .changed-bar {
+        height: 152px;
+        background: linear-gradient(180deg, #f6a3d2, #db2777);
+      }
+
+      .state-diff .changed {
+        outline: 4px solid #ff2d55;
+        outline-offset: 3px;
+      }
+
+      .state-diff .changed-bar {
+        background: #ff2d55;
+        box-shadow: 0 0 0 4px #ff2d55;
+      }
+
+      .demo-controls {
+        position: fixed;
+        left: 50%;
+        bottom: 22px;
+        z-index: 5;
+        display: none;
+        grid-template-columns: repeat(3, auto);
+        gap: 6px;
+        padding: 6px;
+        border: 1px solid #33405a;
+        border-radius: 14px;
+        background: rgba(13, 18, 29, 0.94);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        transform: translateX(-50%);
+        backdrop-filter: blur(14px);
+      }
+
+      .demo .demo-controls { display: grid; }
+
+      .demo-controls button {
+        border: 0;
+        border-radius: 9px;
+        padding: 10px 14px;
+        background: transparent;
+        color: #a9b6c9;
+        font-size: 12px;
+        font-weight: 750;
+        cursor: pointer;
+      }
+
+      .demo-controls button[aria-pressed="true"] {
+        background: #2a2140;
+        color: #ffffff;
+      }
+
+      .capture *, .capture *::before, .capture *::after {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+      }
+
+      dialog {
+        width: min(430px, calc(100vw - 40px));
+        border: 1px solid #3a4660;
+        border-radius: 18px;
+        padding: 0;
+        background: #111724;
+        color: #f6f7fb;
+        box-shadow: 0 30px 100px rgba(0, 0, 0, 0.65);
+      }
+
+      dialog::backdrop {
+        background: rgba(4, 7, 13, 0.72);
+        backdrop-filter: blur(5px);
+      }
+
+      .dialog-content { padding: 28px; }
+      .dialog-content h2 { margin: 0 0 8px; font-size: 22px; }
+      .dialog-content p { margin: 0 0 24px; color: #a9b6c9; line-height: 1.5; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+      .dialog-actions button {
+        border: 1px solid #3a4660;
+        border-radius: 9px;
+        padding: 10px 14px;
+        background: #1b2233;
+        color: #f6f7fb;
+        font-weight: 750;
+      }
+      .dialog-actions .primary { border-color: #7c3aed; background: #7c3aed; }
+
+      .toast {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        z-index: 8;
+        border: 1px solid #285c4e;
+        border-radius: 12px;
+        padding: 13px 16px;
+        background: #102a25;
+        color: #9ff4dc;
+        font-size: 13px;
+        font-weight: 750;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+      }
+
+      @media (max-width: 800px) {
+        body { overflow: auto; }
+        .app { grid-template-columns: 1fr; }
+        .sidebar { display: none; }
+        main { padding: 32px 22px 100px; }
+        .metrics { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app" data-testid="demo-app">
+      <aside class="sidebar">
+        <p class="brand">Acme <span>Analytics</span></p>
+        <nav class="nav" aria-label="Primary navigation">
+          <a href="#" aria-current="page">Overview</a>
+          <a href="#">Reports</a>
+          <a href="#">Customers</a>
+          <a href="#">Settings</a>
+        </nav>
+      </aside>
+
+      <main>
+        <header class="header">
+          <div>
+            <h1>Revenue overview</h1>
+            <p class="subtitle">Performance across the last six months</p>
+          </div>
+          <div class="header-actions">
+            <select class="period" aria-label="Reporting period">
+              <option value="6m">Last 6 months</option>
+              <option value="90d">Last 90 days</option>
+              <option value="30d">Last 30 days</option>
+            </select>
+            <button class="export changed" type="button">Export report</button>
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Revenue metrics">
+          <article class="metric revenue-card changed">
+            <div class="metric-label">Total revenue</div>
+            <div class="metric-value">
+              <strong data-revenue>$84,240</strong>
+              <span class="delta" data-revenue-delta>+12.4%</span>
+            </div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Active customers</div>
+            <div class="metric-value"><strong>1,842</strong><span class="delta">+8.1%</span></div>
+          </article>
+          <article class="metric">
+            <div class="metric-label">Conversion</div>
+            <div class="metric-value"><strong>4.28%</strong><span class="delta">+0.6%</span></div>
+          </article>
+        </section>
+
+        <section class="chart" aria-label="Monthly revenue chart">
+          <div class="chart-header"><strong>Monthly revenue</strong><span class="chart-insight" data-insight>Jan – Jun</span></div>
+          <div class="bars">
+            <button class="bar" type="button" data-month="January" data-value="$11,820" aria-label="January revenue, $11,820" style="--height: 82"></button>
+            <button class="bar" type="button" data-month="February" data-value="$13,460" aria-label="February revenue, $13,460" style="--height: 116"></button>
+            <button class="bar" type="button" data-month="March" data-value="$12,980" aria-label="March revenue, $12,980" style="--height: 96"></button>
+            <button class="bar" type="button" data-month="April" data-value="$16,220" aria-label="April revenue, $16,220" style="--height: 144"></button>
+            <button class="bar changed-bar changed" type="button" data-month="May" data-value="$18,420" aria-label="May revenue, $18,420" style="--height: 126"></button>
+            <button class="bar" type="button" data-month="June" data-value="$18,420" aria-label="June revenue, $18,420" style="--height: 162"></button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog data-export-dialog>
+      <div class="dialog-content">
+        <h2>Export revenue report</h2>
+        <p>Your report includes the selected reporting period, headline metrics, and monthly revenue breakdown.</p>
+        <div class="dialog-actions">
+          <button type="button" data-cancel-export>Cancel</button>
+          <button class="primary" type="button" data-download-report>Download CSV</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div class="toast" role="status" data-toast hidden>Report downloaded successfully</div>
+
+    <div class="demo-controls" aria-label="Demo state">
+      <button type="button" data-state="baseline" aria-pressed="true">Baseline</button>
+      <button type="button" data-state="current" aria-pressed="false">Show proposed change</button>
+      <button type="button" data-state="diff" aria-pressed="false">Highlight diff</button>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search)
+      const initialState = params.get('variant') || 'baseline'
+      const isDemo = params.get('demo') === '1'
+      const isCapture = params.get('capture') === '1'
+      const revenue = document.querySelector('[data-revenue]')
+      const revenueDelta = document.querySelector('[data-revenue-delta]')
+      const controls = [...document.querySelectorAll('[data-state]')]
+      const period = document.querySelector('.period')
+      const bars = [...document.querySelectorAll('.bar')]
+      const insight = document.querySelector('[data-insight]')
+      const exportButton = document.querySelector('.export')
+      const exportDialog = document.querySelector('[data-export-dialog]')
+      const toast = document.querySelector('[data-toast]')
+
+      const periods = {
+        '6m': { revenue: '$91,320', delta: '+18.7%', label: 'Jan – Jun', heights: [82, 116, 96, 144, 152, 162] },
+        '90d': { revenue: '$52,840', delta: '+14.2%', label: 'Last 90 days', heights: [54, 76, 68, 105, 132, 148] },
+        '30d': { revenue: '$18,420', delta: '+9.8%', label: 'Last 30 days', heights: [42, 58, 70, 92, 126, 158] },
+      }
+
+      if (isDemo) document.body.classList.add('demo')
+      if (isCapture) document.body.classList.add('capture')
+
+      function setState(state) {
+        document.body.classList.remove('state-baseline', 'state-current', 'state-diff')
+        document.body.classList.add(`state-${state}`)
+        revenue.textContent = state === 'baseline' ? '$84,240' : '$91,320'
+        revenueDelta.textContent = state === 'baseline' ? '+12.4%' : '+18.7%'
+        controls.forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.state === state))
+        })
+      }
+
+      function setPeriod(value) {
+        const selected = periods[value]
+        revenue.textContent = selected.revenue
+        revenueDelta.textContent = selected.delta
+        insight.textContent = selected.label
+        bars.forEach((bar, index) => bar.style.setProperty('--height', selected.heights[index]))
+      }
+
+      controls.forEach((button) => {
+        button.addEventListener('click', () => setState(button.dataset.state))
+      })
+
+      period.addEventListener('change', () => setPeriod(period.value))
+      bars.forEach((bar) => {
+        bar.addEventListener('click', () => {
+          bars.forEach((candidate) => candidate.classList.remove('is-selected'))
+          bar.classList.add('is-selected')
+          insight.textContent = `${bar.dataset.month}: ${bar.dataset.value}`
+        })
+      })
+      exportButton.addEventListener('click', () => exportDialog.showModal())
+      document.querySelector('[data-cancel-export]').addEventListener('click', () => exportDialog.close())
+      document.querySelector('[data-download-report]').addEventListener('click', () => {
+        exportDialog.close()
+        toast.hidden = false
+      })
+
+      setState(initialState)
+      window.__demoReady = true
+    </script>
+  </body>
+</html>

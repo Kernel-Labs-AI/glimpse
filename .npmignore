@@ -7,6 +7,7 @@ playwright.config.ts
 tests/
 test-results/
 playwright-report/
+docs/demo/playwright/.last-run.json
 
 # Development files
 *.log
@@ -23,4 +24,3 @@ node_modules/
 # NPM
 .npmrc
 package-lock.json
-

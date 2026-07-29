@@ -1,19 +1,20 @@
 import type { ODiffOptions } from 'odiff-bin'
 
 /**
- * Storage provider interface for uploading screenshots
+ * Storage provider interface for uploading artifacts
  */
 export interface StorageProvider {
   /**
-   * Upload a screenshot file
-   * @param filePath - Local path to the screenshot file
+   * Upload an artifact file
+   * @param filePath - Local path to the artifact file
    * @param remotePath - Remote path where the file should be stored
+   * @param options - Optional upload metadata
    * @returns Public URL of the uploaded file
    */
-  upload(filePath: string, remotePath: string): Promise<string>
+  upload(filePath: string, remotePath: string, options?: StorageUploadOptions): Promise<string>
 
   /**
-   * Download a screenshot file from storage.
+   * Download an artifact file from storage.
    * Returns undefined when the remote file does not exist.
    */
   download?(remotePath: string): Promise<Buffer | undefined>
@@ -22,13 +23,6 @@ export interface StorageProvider {
    * Initialize the storage provider (create buckets, etc.)
    */
   initialize?(): Promise<void>
-}
-
-export interface SupabaseConfig {
-  type: 'supabase'
-  url: string
-  key: string
-  bucket?: string
 }
 
 export interface S3Config {
@@ -49,7 +43,12 @@ export interface VercelBlobConfig {
   token?: string
 }
 
-export type StorageConfig = SupabaseConfig | S3Config | VercelBlobConfig
+export type StorageConfig = S3Config | VercelBlobConfig
+
+export interface StorageUploadOptions {
+  /** MIME content type for the uploaded artifact */
+  contentType?: string
+}
 
 export type ScreenshotUploadMode = 'screenshots' | 'diffs'
 
@@ -104,6 +103,25 @@ export interface UploadOptions {
   diff?: ScreenshotDiffOptions
 }
 
+export interface ReplayUploadOptions {
+  /** Directory containing Playwright replay videos */
+  directory: string
+  /** Storage configuration */
+  storage: StorageConfig
+  /** Path template for uploaded files. Variables: {pr}, {runId}, {commit}, {branch}, {filename}, {relativePath} */
+  pathTemplate?: string
+  /** PR number */
+  prNumber?: string | number
+  /** CI run ID */
+  runId?: string | number
+  /** Commit SHA for upload path templates */
+  commitSha?: string | number
+  /** Branch name for upload path templates */
+  branch?: string
+  /** Return an empty upload list instead of throwing when no replay videos are found */
+  allowEmpty?: boolean
+}
+
 export type UploadedScreenshotKind = 'screenshot' | 'diff'
 
 export type UploadedScreenshotDiffReason =
@@ -142,4 +160,16 @@ export interface UploadedScreenshot {
   sourceRelativePath?: string
   /** Visual diff metadata when diff filtering was enabled */
   diff?: UploadedScreenshotDiff
+}
+
+export interface UploadedReplay {
+  name: string
+  url: string
+  path: string
+  /** Uploaded video path relative to the replay root */
+  relativePath?: string
+  /** Display label to use in generated comments */
+  displayName?: string
+  /** MIME content type for the uploaded replay */
+  contentType?: string
 }

@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20, 22, 24]
+        node-version: [22, 24]
 
     steps:
       - uses: actions/checkout@v4
@@ -34,3 +34,6 @@ jobs:
 
       - name: Run tests
         run: npx playwright test
+
+      - name: Run demo app tests
+        run: npm run demo:test
